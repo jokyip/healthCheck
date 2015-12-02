@@ -1,0 +1,35 @@
+<ion-view>
+	<ion-nav-buttons side="left">
+      <button menu-toggle="left" class="button button-icon icon ion-navicon"></button>
+      <h1 class='title'>Response Log</h1>
+    </ion-nav-buttons>
+	<ion-content>
+		<ion-refresher
+		    on-refresh="doRefresh()">
+		</ion-refresher>
+		<ion-list>
+			<label class="item item-input">
+			    <i class="icon ion-search placeholder-icon"></i>
+			    <input type="search" placeholder="Search" ng-model="logFilter">
+			</label>
+			<ion-item ng-repeat="model in collection.models | filter: logFilter" ng-class="model.$hasChanged() ? 'dirty' : ''">				
+				<div class='row'>
+					<div class='col'>
+						{{model.webServer.name}}
+					</div>
+					<div class='col'>
+						{{model.createdAt | date: 'yyyy-MM-dd HH:mm:ss'}}
+					</div>
+					<div class='col'>
+						{{model.statusCode}}
+					</div>
+					<div class='col'>
+						{{model.statusMsg}}
+					</div>
+				</div>
+			</ion-item>
+		</ion-list>
+		<ion-infinite-scroll ng-if="collection.state.skip < collection.state.count" on-infinite="loadMore()">
+		</ion-infinite-scroll>	
+	</ion-content>
+</ion-view>

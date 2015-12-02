@@ -1,0 +1,30 @@
+<ion-view>
+	<ion-nav-buttons side="left">
+      <button menu-toggle="left" class="button button-icon icon ion-navicon"></button>
+      <h1 class='title'>Web Server</h1>
+      <div class="buttons">
+        <button class="button icon-right ion-plus-round" on-tap="$event.stopPropagation(); create()"></button>
+      </div>	
+    </ion-nav-buttons>
+	<ion-content>
+		<ion-list>
+			<ion-item ng-repeat="model in collection.models" ng-class="model.$hasChanged() ? 'dirty' : ''" on-tap="$event.stopPropagation(); read('{{model.id}}');">				
+				<div class='row'>
+					<div class='col'>
+						{{model.name}}
+					</div>
+					<div class='col'>
+						{{model.url}}
+					</div>
+					<div class='col'>
+						{{model.interval}}
+					</div>
+				</div>
+				<ion-option-button class="button button-positive icon-left ion-edit" on-tap="$event.stopPropagation(); edit('{{model.id}}')">Edit</ion-option-button>
+				<ion-option-button class="button button-assertive icon-left ion-trash-b" on-tap="$event.stopPropagation(); delete(model)">Delete</ion-option-button>
+			</ion-item>
+		</ion-list>
+		<ion-infinite-scroll ng-if="collection.state.skip < collection.state.count" on-infinite="loadMore()">
+		</ion-infinite-scroll>	
+	</ion-content>
+</ion-view>

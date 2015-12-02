@@ -1,0 +1,252 @@
+/*
+To customize the look and feel of Ionic, you can override the variables
+in ionic's _variables.scss file.
+
+For example, you might change some of the default colors:
+
+$light:                           #fff !default;
+$stable:                          #f8f8f8 !default;
+$positive:                        #387ef5 !default;
+$calm:                            #11c1f3 !default;
+$balanced:                        #33cd5f !default;
+$energized:                       #ffc900 !default;
+$assertive:                       #ef473a !default;
+$royal:                           #886aea !default;
+$dark:                            #444 !default;
+*/
+
+// The path for our ionicons font files, relative to the built CSS in www/css
+$ionicons-font-path: "../lib/ionic/fonts" !default;
+
+// Include all of Ionic
+@import "www/lib/ionic/scss/ionic";
+
+$select-color:	#bbd8ff;
+
+.item-avatar > img:first-child, .item-avatar .item-content > img:first-child {
+	border-radius: 0;
+}
+
+.selected {
+	background-color: $select-color;
+	
+	.item-content {
+		background-color: $select-color;
+	}
+}
+
+.filelist h2 {
+	display: table;
+	
+	> span, > .tag-editor {
+		display: table-cell;
+	}
+	
+	.tag-editor {
+		border: none;
+		background-color: inherit;
+		
+		.tag-input {
+			background-color: inherit;
+		}
+	}
+}
+
+.button-icon.overlay > i {
+	position: absolute;
+	left: 10%;
+	top: 5%;
+	transform: scale(.4, .4);
+	color: white;
+}
+
+.dirty, .dirty .item-content {
+	background-color: #F78181;
+}
+
+label[disabled] .item-content {
+	background-color: grey;
+}
+
+.list .item.item-accordion {
+	line-height: 38px;
+  	padding-top: 0;
+  	padding-bottom: 0;
+  	transition: 0.09s all linear;
+}
+.list .item.item-accordion.ng-hide {
+  	line-height: 0px;
+}
+.list .item.item-accordion.ng-hide-add,
+.list .item.item-accordion.ng-hide-remove {
+  display: block !important;
+}
+
+div.row .col {
+	padding: 0px;
+	overflow: hidden;
+  	text-overflow: ellipsis;
+  	white-space: nowrap;
+}
+
+.col-5 {
+  -webkit-box-flex: 0;
+  -webkit-flex: 0 0 5%;
+  -moz-box-flex: 0;
+  -moz-flex: 0 0 5%;
+  -ms-flex: 0 0 5%;
+  flex: 0 0 5%;
+  max-width: 5%; }
+
+.col-40 {
+  -webkit-box-flex: 0;
+  -webkit-flex: 0 0 40%;
+  -moz-box-flex: 0;
+  -moz-flex: 0 0 40%;
+  -ms-flex: 0 0 40%;
+  flex: 0 0 40%;
+  max-width: 40%; }
+  
+.col-70 {
+  -webkit-box-flex: 0;
+  -webkit-flex: 0 0 70%;
+  -moz-box-flex: 0;
+  -moz-flex: 0 0 70%;
+  -ms-flex: 0 0 70%;
+  flex: 0 0 70%;
+  max-width: 70%;
+  text-align: center; }
+
+table#reservationList, table#reservationListByResource{
+	margin:0px auto;
+}	
+  
+table#reservationList td, table#reservationList tr th, table#reservationListByResource td, table#reservationListByResource tr th {
+   border: 1px solid black;
+   text-align: left;
+   font-size: 15px;
+   vertical-align: middle;
+   padding: 2px;
+}
+
+table#reservationList td.tableItem, table#reservationListByResource td.tableItem {
+	text-align: center;
+}
+
+.currDate {
+	font-size: 20px;
+	background: #C3DBD9;
+	display: block;
+	padding: 2px 6px;
+}
+
+.date {
+	font-size: 20px;
+	background: #EFDADA;
+	display: block;
+	padding: 2px 6px;
+}
+
+.time {
+	font-size: 18px;
+	color: blue;
+	display: block;
+	padding: 12px 7px 5px;
+}
+
+.purpose {
+	display: block;
+}
+
+.resource {
+	color: crimson;
+	display: block;
+}
+
+.location {
+	font-size: 13px;
+	font-style: italic;
+}
+
+.tab{
+	padding-left: 25px;
+}
+
+table#reservationList th.th-timeslot, table#reservationListByResource th.th-timeslot {
+	background-color: #A9BCF5;
+	font-weight: bold;
+	text-align: center;
+}
+
+.td-resource{
+	background-color: #F5D0A9;
+}
+
+.td-resource-holiday{
+	background-color: #F5D0A9;
+	color: red;
+}
+
+.td-reserved{
+	background-color: #BDBDBD;
+}
+
+.nav-day {
+	margin-top: 10px;
+	margin-bottom: 10px;
+	max-width: 5%;		
+}
+
+ion-item[isOdd='true'] > div.item-content{
+        background-color: #E6E6E6 !important;
+}
+
+ion-item[isOdd='false'] > div.item-content{
+    background-color: #F2F2F2 !important;
+}
+
+.ion-person, .ion-person-add {
+  font-size: 35px;
+}
+
+.button.button-white {
+    background-color: white;
+    color: #fff; }
+  	.button.button-white.button-clear {
+      border-color: transparent;
+      background: none;
+      box-shadow: none;
+      color: white; }
+      
+table#reservationListByResource thead th {
+	border: none;
+	text-align: center;
+	font-size: 16px;
+	vertical-align: middle;
+	padding: 10px 5px;
+} 
+
+.icon-person-color {
+	color: blue;
+}
+
+label[disabled='disabled'] {
+	background-color: grey;
+}
+
+span.noReservation {
+	font-size: 15px;
+	display: block;
+	padding: 10px 6px;
+	text-align: center;
+	font-style: italic;
+	color: #848484;
+}
+
+span.fancySelect, div.datepicker {
+	margin: 0px auto;
+}
+
+input[type='search'] {
+	text-align: center;
+}

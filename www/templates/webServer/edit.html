@@ -1,0 +1,22 @@
+<ion-view>
+  <ion-nav-buttons side="left">
+  	<h1 class="title">Web Server</h1>
+	<button class="button button-clear button-positive" ng-click="save()">OK</button>
+  </ion-nav-buttons>
+  <ion-content padding="true">
+	<div class="list">
+		<label class="item item-input">
+	    	<span class="input-label">Name</span>
+	    	<input type="text" ng-model="model.name">
+		</label>
+		<label class="item item-input">
+	    	<span class="input-label">URL</span>
+	    	<input type="text" ng-model="model.url">
+		</label>
+		<label class="item item-input">
+	    	<span class="input-label">Interval</span>
+	    	<input type="text" ng-model="model.interval">
+		</label>
+	</div>
+  </ion-content>
+</ion-view>

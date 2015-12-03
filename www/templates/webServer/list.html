@@ -19,6 +19,9 @@
 					<div class='col'>
 						{{model.interval}}
 					</div>
+					<div class='col'>
+						{{model.proxy?'Y':'N'}}
+					</div>
 				</div>
 				<ion-option-button class="button button-positive icon-left ion-edit" on-tap="$event.stopPropagation(); edit('{{model.id}}')">Edit</ion-option-button>
 				<ion-option-button class="button button-assertive icon-left ion-trash-b" on-tap="$event.stopPropagation(); delete(model)">Delete</ion-option-button>

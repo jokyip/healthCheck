@@ -26668,7 +26668,7 @@ module.config(function($stateProvider, $urlRouterProvider) {
       }
     }
   });
-  return $urlRouterProvider.otherwise('/webServer');
+  return $urlRouterProvider.otherwise('/resLog');
 });
 
 

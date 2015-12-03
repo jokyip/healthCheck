@@ -29,4 +29,9 @@ module.exports =
 			password:	'pass1234'
 			database:	'healthCheck'
 	log:
-		level:		'silly'					
+		level:		'silly'
+	resLog:
+		type:
+			error: 		'Error'
+			success: 	'Success'
+							

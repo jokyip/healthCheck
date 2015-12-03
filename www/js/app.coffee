@@ -88,4 +88,4 @@ module.config ($stateProvider, $urlRouterProvider) ->
 				ret = new cliModel.ResLogList()
 				ret.$fetch()
 		
-	$urlRouterProvider.otherwise('/webServer')
+	$urlRouterProvider.otherwise('/resLog')

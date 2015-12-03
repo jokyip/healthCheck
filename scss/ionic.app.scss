@@ -250,3 +250,7 @@ span.fancySelect, div.datepicker {
 input[type='search'] {
 	text-align: center;
 }
+
+.error, .error .item-content {
+	color: red;
+}

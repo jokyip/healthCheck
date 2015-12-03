@@ -23,10 +23,11 @@ module.exports =
 		statusMsg:
 			type: 		'string'
 			required:	true
+		statusType:
+			type:		'string'	
 		createdAt:
 			type:		'datetime'
 			defaultsTo:	new Date(0)
 		createdBy:
 			type: 		'string'
-			required:	true	
-
+			required:	true

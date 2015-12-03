@@ -12,7 +12,7 @@
 			    <i class="icon ion-search placeholder-icon"></i>
 			    <input type="search" placeholder="Search" ng-model="logFilter">
 			</label>
-			<ion-item ng-repeat="model in collection.models | filter: logFilter" ng-class="model.$hasChanged() ? 'dirty' : ''">				
+			<ion-item ng-repeat="model in collection.models | filter: logFilter" ng-class="model.statusType == 'Error' ? 'error' : ''">				
 				<div class='row'>
 					<div class='col'>
 						{{model.webServer.name}}
@@ -25,6 +25,9 @@
 					</div>
 					<div class='col'>
 						{{model.statusMsg}}
+					</div>
+					<div class='col'>
+						{{model.statusType}}
 					</div>
 				</div>
 			</ion-item>

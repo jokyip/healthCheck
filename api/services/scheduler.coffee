@@ -6,23 +6,23 @@ jobManager = {}
 
 module.exports = 
 	add: (server) ->
+		opts = if server.proxy then sails.config.http.opts else ""
 		interval = Math.max server.interval, sails.config.webServer.access.interval
 		job = new schedule.CronJob "*/#{interval} * * * * *", ->
-	    	http.get server.url, sails.config.http.opts, (err, res) ->
+	    	http.get server.url, opts , (err, res) ->
+		    	instance = 
+		    		webServer: server
+		    		createdBy: server.createdBy		    				    	
 		    	if err
 		    		sails.log.error err
-		    		instance = 
-		    			webServer: server
-		    			statusCode: 500
-		    			statusMsg: err.message
-		    			createdBy: server.createdBy
-		    	if res
-		    		instance = 
-		    			webServer: server
-		    			statusCode: res.statusCode
-		    			statusMsg: status[res.statusCode]
-		    			createdBy: server.createdBy		    							    			
-	    		sails.log.info """ #{instance.webServer.name} | #{instance.webServer.url} | #{instance.statusCode} | #{instance.statusMsg} | #{instance.createdBy} """
+		    		instance.statusCode = 500
+		    		instance.statusMsg = err.message
+		    		instance.statusType = sails.config.resLog.type.error
+		    	else if res
+		    		instance.statusCode = res.statusCode
+		    		instance.statusMsg = status[res.statusCode]   	
+		    		instance.statusType = if res.statusCode >= 400 then sails.config.resLog.type.error else sails.config.resLog.type.success					    			
+	    		sails.log.info """ #{instance.webServer.name} | #{instance.webServer.url} | #{instance.statusCode} | #{instance.statusMsg} | #{instance.statusType} | #{instance.createdBy} """
 	    		sails.models.reslog
 	    			.create(instance)
 	    			.catch (err) ->

@@ -9,7 +9,7 @@ module.exports =
 	imUrl: () ->
 		"https://mppsrc.ogcio.hksarg/im"
 	serverUrl: (path = @path) ->
-		"http://localhost:3000/#{path}"
+		"http://localhost:3000"
 	path: 'healthCheck'		
 	oauth2: ->
 		authUrl: "#{@authUrl}/org/oauth2/authorize/"

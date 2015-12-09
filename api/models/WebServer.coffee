@@ -24,10 +24,7 @@ module.exports =
 			required:	true
 		interval:
 			type: 		'integer'
-			defaultsTo:	5
-		proxy:
-			type: 		'boolean'
-			defaultsTo:	false	
+			defaultsTo:	5	
 		createdAt:
 			type:		'datetime'
 			defaultsTo:	new Date()

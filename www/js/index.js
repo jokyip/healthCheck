@@ -26773,7 +26773,7 @@ module.exports = {
     if (path == null) {
       path = this.path;
     }
-    return "http://localhost:3000/" + path;
+    return "http://localhost:3000";
   },
   path: 'healthCheck',
   oauth2: function() {

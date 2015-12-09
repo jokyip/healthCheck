@@ -6,10 +6,9 @@ jobManager = {}
 
 module.exports = 
 	add: (server) ->
-		opts = if server.proxy then sails.config.http.opts else ""
 		interval = Math.max server.interval, sails.config.webServer.access.interval
-		job = new schedule.CronJob "*/#{interval} * * * * *", ->
-	    	http.get server.url, opts , (err, res) ->
+		job = new schedule.CronJob "0 0-59/#{interval} * * * *", ->
+	    	http.get server.url, sails.config.http.opts , (err, res) ->
 		    	instance = 
 		    		webServer: server
 		    		createdBy: server.createdBy		    				    	

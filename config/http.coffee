@@ -4,10 +4,6 @@ module.exports =
 	http:
 		middleware:
 			static: express.static('www')
-			prefix: (req, res, next) ->
-				p = new RegExp('^' + sails.config.path)
-				req.url = req.url.replace(p, '')
-				next()
 			resHeader: (req, res, next) ->
 				res.set sails.config.csp
 				next()
@@ -15,7 +11,6 @@ module.exports =
 				'startRequestTimer'
 				'cookieParser'
 				'session'
-				'prefix'
 				'resHeader'
 				'bodyParser'
 				'compress'

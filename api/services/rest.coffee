@@ -43,7 +43,7 @@ module.exports =
 	#	secret:	user password
 	# scope:	[ "https://mob.myvnc.com/org/users", "https://mob.myvnc.com/mobile"]
 	token: (url, client, user, scope) ->
-		opts = _.extend options,
+		opts = _.extend options, sails.config.http.opts,
 			headers =
 				'Content-Type':	'application/x-www-form-urlencoded'
 				username:		client.id

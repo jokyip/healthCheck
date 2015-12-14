@@ -19,15 +19,15 @@ sendNotification = (instance) ->
 	fulfill = (result) ->
 		if sails.config.im.sendmsg
 			fulfillmsg = (result) ->
-				sails.log "sendMsg fulfill"	
+				sails.log.info "Notification is sent to " + result.body.to
 			rejectmsg = (err) ->
-				sails.log "sendMsg reject: " + err
+				sails.log.error "Notification is sent with error: " + err
 			#send msg	
 			sendMsg(instance, result.body.access_token).then fulfillmsg, rejectmsg
 		else 	
-			#sails.log "config not send msg"
+			sails.log.warn "Send notification is disabled. Please check system configuration."
 	reject = (err) ->
-		sails.log "getToken reject"
+		sails.log.error "Error in authorization token : " + err
 	getToken().then fulfill, reject
 	
 sendMsg = (instance, todoAdminToken) ->
@@ -44,7 +44,6 @@ sendMsg = (instance, todoAdminToken) ->
 		
 		
 		http.post sails.config.im.url, data, opts, (err, res) ->
-			#sails.log "post msg : " + JSON.stringify res.body
 			if err
 				return reject err
 			fulfill res	
@@ -73,7 +72,7 @@ module.exports =
 		    		instance.statusCode = res.statusCode
 		    		instance.statusMsg = status[res.statusCode]   	
 		    		instance.statusType = if res.statusCode >= 400 then sails.config.resLog.type.error else sails.config.resLog.type.success					    			
-	    		sails.log.info """ #{instance.webServer.name} | #{instance.webServer.url} | #{instance.statusCode} | #{instance.statusMsg} | #{instance.statusType} | #{instance.createdBy} """
+	    		sails.log.info "Health Check result: " + """ #{instance.webServer.name} | #{instance.webServer.url} | #{instance.statusCode} | #{instance.statusMsg} | #{instance.statusType} | #{instance.createdBy} """
 	    		sails.models.reslog
 	    			.create(instance)
 	    			.then ->

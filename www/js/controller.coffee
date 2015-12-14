@@ -22,7 +22,8 @@ WebServerListCtrl = ($scope, collection, $location) ->
 		edit: (id) ->
 			$location.url "/webServer/edit/#{id}"			
 		delete: (obj) ->
-			obj.$destroy()
+			collection.remove obj
+			$state.go($state.current, {}, { reload: true })
 		loadMore: ->
 			collection.$fetch()
 				.then ->

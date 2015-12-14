@@ -13,7 +13,6 @@ module.exports =
 		
 		Model.create(data)
 			.then (newInstance) ->
-				sails.log newInstance
 				sails.services.scheduler.add newInstance
 				res.created(newInstance)
 			.catch res.serverError
@@ -26,7 +25,6 @@ module.exports =
 		Model
 			.update({id: pk},data)
       		.then (updatedInstance) ->
-				sails.log updatedInstance
 				sails.services.scheduler.update updatedInstance[0]
 				res.ok()
 			.catch res.serverError
@@ -38,7 +36,6 @@ module.exports =
 		Model
 			.destroy({id: pk})
       		.then (deletedInstance) ->
-				sails.log pk
 				sails.services.scheduler.remove deletedInstance[0]
 				res.ok()
 			.catch res.serverError		

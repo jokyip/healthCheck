@@ -9,7 +9,8 @@ ca = files.map (file) -> fs.readFileSync file
 
 options = 
 	timeout:	sails.config.promise.timeout
-	ca:			ca	
+	ca:			ca
+tokenOptions = _.clone options		
 		
 module.exports =
 	get: (token, url) ->
@@ -43,7 +44,7 @@ module.exports =
 	#	secret:	user password
 	# scope:	[ "https://mob.myvnc.com/org/users", "https://mob.myvnc.com/mobile"]
 	token: (url, client, user, scope) ->
-		opts = _.extend options, sails.config.http.opts,
+		opts = _.extend tokenOptions, sails.config.http.opts,
 			headers =
 				'Content-Type':	'application/x-www-form-urlencoded'
 				username:		client.id

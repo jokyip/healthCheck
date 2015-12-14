@@ -26710,7 +26710,10 @@ WebServerListCtrl = function($scope, collection, $location) {
       return $location.url("/webServer/edit/" + id);
     },
     "delete": function(obj) {
-      return obj.$destroy();
+      collection.remove(obj);
+      return $state.go($state.current, {}, {
+        reload: true
+      });
     },
     loadMore: function() {
       return collection.$fetch().then(function() {

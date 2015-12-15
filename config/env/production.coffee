@@ -1,9 +1,7 @@
 path = '/healthCheck'
 
 module.exports =
-	path:			path
-	url:			"http://localhost:3000"
-	port: 			3000
+	port: 			8014
 	promise:
 		timeout:	10000 # ms
 	oauth2:
@@ -19,7 +17,7 @@ module.exports =
 		mongo:
 			adapter:	'sails-mongo'
 			driver:		'mongodb'
-			host:		'localhost'
+			host:		'db'
 			port:		27017
 			user:		'healthCheckrw'
 			password:	'pass1234'

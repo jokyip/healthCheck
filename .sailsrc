@@ -1,8 +1,9 @@
 {
   "generators": {
-    "modules": {
-      "model": "sails-generate-model-coffee",
-      "controller": "sails-generate-controller-coffee"
-    }
+    "modules": {}
+  },
+  "hooks": {
+    "grunt": false,
+    "csrf": false
   }
 }

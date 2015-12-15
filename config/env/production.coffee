@@ -28,4 +28,18 @@ module.exports =
 		type:
 			error: 		'Error'
 			success: 	'Success'
+	im:
+		url: 		"https://mob.myvnc.com/im.app/api/msg"
+		client:
+			id:		'todomsgDEVAuth'
+			secret: 'pass1234'
+		user:
+			id: 	'todoadmin'
+			secret: 'pass1234'
+		scope:  	[ "https://mob.myvnc.com/org/users", "https://mob.myvnc.com/mobile"]
+		txt:		"Health Check message"
+		xmpp:
+			domain:	'mob.myvnc.com'
+		adminjid:	"todoadmin@mob.myvnc.com"
+		sendmsg:	true		
 							

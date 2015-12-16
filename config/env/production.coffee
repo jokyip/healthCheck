@@ -1,7 +1,6 @@
 path = 'healthCheck'
 
 module.exports =
-	url:			"http://mob.myvnc.com/#{path}"
 	port: 			8020
 	promise:
 		timeout:	10000 # ms

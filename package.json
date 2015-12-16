@@ -7,6 +7,7 @@
   "dependencies": {
   	"coffee-script": "^1.9.2",
   	"cron":"^1.0.6",
+  	"dateformat":"^1.0.12",
     "ejs": "~0.8.4",
     "express": "^4.12.3",
     "https-proxy-agent": "~1.0.0",

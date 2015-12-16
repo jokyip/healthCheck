@@ -3,6 +3,7 @@ http = require 'needle'
 status = require 'statuses'
 Promise = require 'promise'
 fs = require 'fs'
+dateformat = require 'dateformat'
 
 dir = '/etc/ssl/certs'
 files = fs.readdirSync(dir).filter (file) -> /.*\.pem/i.test(file)
@@ -40,9 +41,8 @@ sendMsg = (instance, todoAdminToken) ->
 		data = 
 			from: 	sails.config.im.adminjid
 			to:		"#{instance.createdBy}@#{sails.config.im.xmpp.domain}"
-			body: 	sails.config.im.txt	+ " -> Name : " + instance.webServer.name + ", Code : " + instance.statusCode + ", Msg : " + instance.statusMsg	
-		
-		
+			body: 	sails.config.im.txt	+ " -> Time : " + dateformat(instance.createdAt, 'dd/mmm/yyyy HH:MM') + ", Name : " + instance.webServer.name + ", Code : " + instance.statusCode + ", Msg : " + instance.statusMsg	
+
 		http.post sails.config.im.url, data, opts, (err, res) ->
 			if err
 				return reject err
@@ -57,9 +57,10 @@ getToken = ->
 
 module.exports = 
 	add: (server) ->
+		opts = _.extend options, sails.config.http.opts
 		interval = Math.max server.interval, sails.config.webServer.access.interval
 		job = new schedule.CronJob "0 0-59/#{interval} * * * *", ->
-	    	http.get server.url, sails.config.http.opts , (err, res) ->
+	    	http.get server.url, opts , (err, res) ->
 		    	instance = 
 		    		webServer: server
 		    		createdBy: server.createdBy		    				    	
@@ -75,9 +76,9 @@ module.exports =
 	    		sails.log.info "Health Check result: " + """ #{instance.webServer.name} | #{instance.webServer.url} | #{instance.statusCode} | #{instance.statusMsg} | #{instance.statusType} | #{instance.createdBy} """
 	    		sails.models.reslog
 	    			.create(instance)
-	    			.then ->
-	    				if instance.statusType == sails.config.resLog.type.error
-	    					sendNotification(instance)
+	    			.then (result) ->
+	    				if result.statusType == sails.config.resLog.type.error
+	    					sendNotification(result)
 	    			.catch (err) ->
 	    				sails.log err
 		, null, true, ''

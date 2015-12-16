@@ -11,31 +11,31 @@ window.alert = function(err) {
 
 window.Promise = require('promise');
 
-window._ = require("./../../bower_components/underscore/underscore.js");
+window._ = require("./../lib/underscore/underscore.js");
 
-window.$ = require("./../../bower_components/jquery/dist/jquery.js");
+window.$ = require("./../lib/jquery/dist/jquery.js");
 
-window.$.deparam = require("./../../bower_components/jquery-deparam/jquery-deparam.js");
+window.$.deparam = require("./../lib/jquery-deparam/jquery-deparam.js");
 
 if (env.isNative()) {
   window.$.getScript('cordova.js');
 }
 
-require("./../../bower_components/ngCordova/dist/ng-cordova.js");
+require("./../lib/ngCordova/dist/ng-cordova.js");
 
-require("./../../bower_components/angular-activerecord/src/angular-activerecord.js");
+require("./../lib/angular-activerecord/src/angular-activerecord.js");
 
-require("./../../bower_components/angular-http-auth/src/http-auth-interceptor.js");
+require("./../lib/angular-http-auth/src/http-auth-interceptor.js");
 
-require("./../../bower_components/angular-touch/angular-touch.js");
+require("./../lib/angular-touch/angular-touch.js");
 
-require("./../../bower_components/ng-file-upload/angular-file-upload.js");
+require("./../lib/ng-file-upload/angular-file-upload.js");
 
-require("./../../bower_components/tagDirective/index.js");
+require("./../lib/tagDirective/index.js");
 
-require("./../../bower_components/angular-translate/angular-translate.js");
+require("./../lib/angular-translate/angular-translate.js");
 
-require("./../../bower_components/angular-translate-loader-static-files/angular-translate-loader-static-files.js");
+require("./../lib/angular-translate-loader-static-files/angular-translate-loader-static-files.js");
 
 require('./app.coffee');
 
@@ -47,11 +47,1421 @@ require('./platform.coffee');
 
 require('./locale.coffee');
 
-require("./../../bower_components/ionic-press-again-to-exit/index.js");
+require("./../lib/ionic-press-again-to-exit/index.js");
 
 
 
-},{"./../../bower_components/angular-activerecord/src/angular-activerecord.js":2,"./../../bower_components/angular-http-auth/src/http-auth-interceptor.js":3,"./../../bower_components/angular-touch/angular-touch.js":4,"./../../bower_components/angular-translate-loader-static-files/angular-translate-loader-static-files.js":5,"./../../bower_components/angular-translate/angular-translate.js":6,"./../../bower_components/ionic-press-again-to-exit/index.js":7,"./../../bower_components/jquery-deparam/jquery-deparam.js":8,"./../../bower_components/jquery/dist/jquery.js":9,"./../../bower_components/ng-file-upload/angular-file-upload.js":10,"./../../bower_components/ngCordova/dist/ng-cordova.js":11,"./../../bower_components/tagDirective/index.js":13,"./../../bower_components/underscore/underscore.js":16,"./app.coffee":26,"./controller.coffee":27,"./env.coffee":28,"./locale.coffee":29,"./model.coffee":30,"./platform.coffee":31,"promise":19}],2:[function(require,module,exports){
+},{"./../lib/angular-activerecord/src/angular-activerecord.js":17,"./../lib/angular-http-auth/src/http-auth-interceptor.js":18,"./../lib/angular-touch/angular-touch.js":19,"./../lib/angular-translate-loader-static-files/angular-translate-loader-static-files.js":20,"./../lib/angular-translate/angular-translate.js":21,"./../lib/ionic-press-again-to-exit/index.js":22,"./../lib/jquery-deparam/jquery-deparam.js":23,"./../lib/jquery/dist/jquery.js":24,"./../lib/ng-file-upload/angular-file-upload.js":25,"./../lib/ngCordova/dist/ng-cordova.js":26,"./../lib/tagDirective/index.js":28,"./../lib/underscore/underscore.js":31,"./app.coffee":11,"./controller.coffee":12,"./env.coffee":13,"./locale.coffee":14,"./model.coffee":15,"./platform.coffee":16,"promise":4}],2:[function(require,module,exports){
+"use strict";
+
+// rawAsap provides everything we need except exception management.
+var rawAsap = require("./raw");
+// RawTasks are recycled to reduce GC churn.
+var freeTasks = [];
+// We queue errors to ensure they are thrown in right order (FIFO).
+// Array-as-queue is good enough here, since we are just dealing with exceptions.
+var pendingErrors = [];
+var requestErrorThrow = rawAsap.makeRequestCallFromTimer(throwFirstError);
+
+function throwFirstError() {
+    if (pendingErrors.length) {
+        throw pendingErrors.shift();
+    }
+}
+
+/**
+ * Calls a task as soon as possible after returning, in its own event, with priority
+ * over other events like animation, reflow, and repaint. An error thrown from an
+ * event will not interrupt, nor even substantially slow down the processing of
+ * other events, but will be rather postponed to a lower priority event.
+ * @param {{call}} task A callable object, typically a function that takes no
+ * arguments.
+ */
+module.exports = asap;
+function asap(task) {
+    var rawTask;
+    if (freeTasks.length) {
+        rawTask = freeTasks.pop();
+    } else {
+        rawTask = new RawTask();
+    }
+    rawTask.task = task;
+    rawAsap(rawTask);
+}
+
+// We wrap tasks with recyclable task objects.  A task object implements
+// `call`, just like a function.
+function RawTask() {
+    this.task = null;
+}
+
+// The sole purpose of wrapping the task is to catch the exception and recycle
+// the task object after its single use.
+RawTask.prototype.call = function () {
+    try {
+        this.task.call();
+    } catch (error) {
+        if (asap.onerror) {
+            // This hook exists purely for testing purposes.
+            // Its name will be periodically randomized to break any code that
+            // depends on its existence.
+            asap.onerror(error);
+        } else {
+            // In a web browser, exceptions are not fatal. However, to avoid
+            // slowing down the queue of pending tasks, we rethrow the error in a
+            // lower priority turn.
+            pendingErrors.push(error);
+            requestErrorThrow();
+        }
+    } finally {
+        this.task = null;
+        freeTasks[freeTasks.length] = this;
+    }
+};
+
+},{"./raw":3}],3:[function(require,module,exports){
+(function (global){
+"use strict";
+
+// Use the fastest means possible to execute a task in its own turn, with
+// priority over other events including IO, animation, reflow, and redraw
+// events in browsers.
+//
+// An exception thrown by a task will permanently interrupt the processing of
+// subsequent tasks. The higher level `asap` function ensures that if an
+// exception is thrown by a task, that the task queue will continue flushing as
+// soon as possible, but if you use `rawAsap` directly, you are responsible to
+// either ensure that no exceptions are thrown from your task, or to manually
+// call `rawAsap.requestFlush` if an exception is thrown.
+module.exports = rawAsap;
+function rawAsap(task) {
+    if (!queue.length) {
+        requestFlush();
+        flushing = true;
+    }
+    // Equivalent to push, but avoids a function call.
+    queue[queue.length] = task;
+}
+
+var queue = [];
+// Once a flush has been requested, no further calls to `requestFlush` are
+// necessary until the next `flush` completes.
+var flushing = false;
+// `requestFlush` is an implementation-specific method that attempts to kick
+// off a `flush` event as quickly as possible. `flush` will attempt to exhaust
+// the event queue before yielding to the browser's own event loop.
+var requestFlush;
+// The position of the next task to execute in the task queue. This is
+// preserved between calls to `flush` so that it can be resumed if
+// a task throws an exception.
+var index = 0;
+// If a task schedules additional tasks recursively, the task queue can grow
+// unbounded. To prevent memory exhaustion, the task queue will periodically
+// truncate already-completed tasks.
+var capacity = 1024;
+
+// The flush function processes all tasks that have been scheduled with
+// `rawAsap` unless and until one of those tasks throws an exception.
+// If a task throws an exception, `flush` ensures that its state will remain
+// consistent and will resume where it left off when called again.
+// However, `flush` does not make any arrangements to be called again if an
+// exception is thrown.
+function flush() {
+    while (index < queue.length) {
+        var currentIndex = index;
+        // Advance the index before calling the task. This ensures that we will
+        // begin flushing on the next task the task throws an error.
+        index = index + 1;
+        queue[currentIndex].call();
+        // Prevent leaking memory for long chains of recursive calls to `asap`.
+        // If we call `asap` within tasks scheduled by `asap`, the queue will
+        // grow, but to avoid an O(n) walk for every task we execute, we don't
+        // shift tasks off the queue after they have been executed.
+        // Instead, we periodically shift 1024 tasks off the queue.
+        if (index > capacity) {
+            // Manually shift all values starting at the index back to the
+            // beginning of the queue.
+            for (var scan = 0, newLength = queue.length - index; scan < newLength; scan++) {
+                queue[scan] = queue[scan + index];
+            }
+            queue.length -= index;
+            index = 0;
+        }
+    }
+    queue.length = 0;
+    index = 0;
+    flushing = false;
+}
+
+// `requestFlush` is implemented using a strategy based on data collected from
+// every available SauceLabs Selenium web driver worker at time of writing.
+// https://docs.google.com/spreadsheets/d/1mG-5UYGup5qxGdEMWkhP6BWCz053NUb2E1QoUTU16uA/edit#gid=783724593
+
+// Safari 6 and 6.1 for desktop, iPad, and iPhone are the only browsers that
+// have WebKitMutationObserver but not un-prefixed MutationObserver.
+// Must use `global` instead of `window` to work in both frames and web
+// workers. `global` is a provision of Browserify, Mr, Mrs, or Mop.
+var BrowserMutationObserver = global.MutationObserver || global.WebKitMutationObserver;
+
+// MutationObservers are desirable because they have high priority and work
+// reliably everywhere they are implemented.
+// They are implemented in all modern browsers.
+//
+// - Android 4-4.3
+// - Chrome 26-34
+// - Firefox 14-29
+// - Internet Explorer 11
+// - iPad Safari 6-7.1
+// - iPhone Safari 7-7.1
+// - Safari 6-7
+if (typeof BrowserMutationObserver === "function") {
+    requestFlush = makeRequestCallFromMutationObserver(flush);
+
+// MessageChannels are desirable because they give direct access to the HTML
+// task queue, are implemented in Internet Explorer 10, Safari 5.0-1, and Opera
+// 11-12, and in web workers in many engines.
+// Although message channels yield to any queued rendering and IO tasks, they
+// would be better than imposing the 4ms delay of timers.
+// However, they do not work reliably in Internet Explorer or Safari.
+
+// Internet Explorer 10 is the only browser that has setImmediate but does
+// not have MutationObservers.
+// Although setImmediate yields to the browser's renderer, it would be
+// preferrable to falling back to setTimeout since it does not have
+// the minimum 4ms penalty.
+// Unfortunately there appears to be a bug in Internet Explorer 10 Mobile (and
+// Desktop to a lesser extent) that renders both setImmediate and
+// MessageChannel useless for the purposes of ASAP.
+// https://github.com/kriskowal/q/issues/396
+
+// Timers are implemented universally.
+// We fall back to timers in workers in most engines, and in foreground
+// contexts in the following browsers.
+// However, note that even this simple case requires nuances to operate in a
+// broad spectrum of browsers.
+//
+// - Firefox 3-13
+// - Internet Explorer 6-9
+// - iPad Safari 4.3
+// - Lynx 2.8.7
+} else {
+    requestFlush = makeRequestCallFromTimer(flush);
+}
+
+// `requestFlush` requests that the high priority event queue be flushed as
+// soon as possible.
+// This is useful to prevent an error thrown in a task from stalling the event
+// queue if the exception handled by Node.js’s
+// `process.on("uncaughtException")` or by a domain.
+rawAsap.requestFlush = requestFlush;
+
+// To request a high priority event, we induce a mutation observer by toggling
+// the text of a text node between "1" and "-1".
+function makeRequestCallFromMutationObserver(callback) {
+    var toggle = 1;
+    var observer = new BrowserMutationObserver(callback);
+    var node = document.createTextNode("");
+    observer.observe(node, {characterData: true});
+    return function requestCall() {
+        toggle = -toggle;
+        node.data = toggle;
+    };
+}
+
+// The message channel technique was discovered by Malte Ubl and was the
+// original foundation for this library.
+// http://www.nonblocking.io/2011/06/windownexttick.html
+
+// Safari 6.0.5 (at least) intermittently fails to create message ports on a
+// page's first load. Thankfully, this version of Safari supports
+// MutationObservers, so we don't need to fall back in that case.
+
+// function makeRequestCallFromMessageChannel(callback) {
+//     var channel = new MessageChannel();
+//     channel.port1.onmessage = callback;
+//     return function requestCall() {
+//         channel.port2.postMessage(0);
+//     };
+// }
+
+// For reasons explained above, we are also unable to use `setImmediate`
+// under any circumstances.
+// Even if we were, there is another bug in Internet Explorer 10.
+// It is not sufficient to assign `setImmediate` to `requestFlush` because
+// `setImmediate` must be called *by name* and therefore must be wrapped in a
+// closure.
+// Never forget.
+
+// function makeRequestCallFromSetImmediate(callback) {
+//     return function requestCall() {
+//         setImmediate(callback);
+//     };
+// }
+
+// Safari 6.0 has a problem where timers will get lost while the user is
+// scrolling. This problem does not impact ASAP because Safari 6.0 supports
+// mutation observers, so that implementation is used instead.
+// However, if we ever elect to use timers in Safari, the prevalent work-around
+// is to add a scroll event listener that calls for a flush.
+
+// `setTimeout` does not call the passed callback if the delay is less than
+// approximately 7 in web workers in Firefox 8 through 18, and sometimes not
+// even then.
+
+function makeRequestCallFromTimer(callback) {
+    return function requestCall() {
+        // We dispatch a timeout with a specified delay of 0 for engines that
+        // can reliably accommodate that request. This will usually be snapped
+        // to a 4 milisecond delay, but once we're flushing, there's no delay
+        // between events.
+        var timeoutHandle = setTimeout(handleTimer, 0);
+        // However, since this timer gets frequently dropped in Firefox
+        // workers, we enlist an interval handle that will try to fire
+        // an event 20 times per second until it succeeds.
+        var intervalHandle = setInterval(handleTimer, 50);
+
+        function handleTimer() {
+            // Whichever timer succeeds will cancel both timers and
+            // execute the callback.
+            clearTimeout(timeoutHandle);
+            clearInterval(intervalHandle);
+            callback();
+        }
+    };
+}
+
+// This is for `asap.js` only.
+// Its name will be periodically randomized to break any code that depends on
+// its existence.
+rawAsap.makeRequestCallFromTimer = makeRequestCallFromTimer;
+
+// ASAP was originally a nextTick shim included in Q. This was factored out
+// into this ASAP package. It was later adapted to RSVP which made further
+// amendments. These decisions, particularly to marginalize MessageChannel and
+// to capture the MutationObserver implementation in a closure, were integrated
+// back into ASAP proper.
+// https://github.com/tildeio/rsvp.js/blob/cddf7232546a9cf858524b75cde6f9edf72620a7/lib/rsvp/asap.js
+
+}).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
+},{}],4:[function(require,module,exports){
+'use strict';
+
+module.exports = require('./lib')
+
+},{"./lib":9}],5:[function(require,module,exports){
+'use strict';
+
+var asap = require('asap/raw');
+
+function noop() {}
+
+// States:
+//
+// 0 - pending
+// 1 - fulfilled with _value
+// 2 - rejected with _value
+// 3 - adopted the state of another promise, _value
+//
+// once the state is no longer pending (0) it is immutable
+
+// All `_` prefixed properties will be reduced to `_{random number}`
+// at build time to obfuscate them and discourage their use.
+// We don't use symbols or Object.defineProperty to fully hide them
+// because the performance isn't good enough.
+
+
+// to avoid using try/catch inside critical functions, we
+// extract them to here.
+var LAST_ERROR = null;
+var IS_ERROR = {};
+function getThen(obj) {
+  try {
+    return obj.then;
+  } catch (ex) {
+    LAST_ERROR = ex;
+    return IS_ERROR;
+  }
+}
+
+function tryCallOne(fn, a) {
+  try {
+    return fn(a);
+  } catch (ex) {
+    LAST_ERROR = ex;
+    return IS_ERROR;
+  }
+}
+function tryCallTwo(fn, a, b) {
+  try {
+    fn(a, b);
+  } catch (ex) {
+    LAST_ERROR = ex;
+    return IS_ERROR;
+  }
+}
+
+module.exports = Promise;
+
+function Promise(fn) {
+  if (typeof this !== 'object') {
+    throw new TypeError('Promises must be constructed via new');
+  }
+  if (typeof fn !== 'function') {
+    throw new TypeError('not a function');
+  }
+  this._37 = 0;
+  this._12 = null;
+  this._59 = [];
+  if (fn === noop) return;
+  doResolve(fn, this);
+}
+Promise._99 = noop;
+
+Promise.prototype.then = function(onFulfilled, onRejected) {
+  if (this.constructor !== Promise) {
+    return safeThen(this, onFulfilled, onRejected);
+  }
+  var res = new Promise(noop);
+  handle(this, new Handler(onFulfilled, onRejected, res));
+  return res;
+};
+
+function safeThen(self, onFulfilled, onRejected) {
+  return new self.constructor(function (resolve, reject) {
+    var res = new Promise(noop);
+    res.then(resolve, reject);
+    handle(self, new Handler(onFulfilled, onRejected, res));
+  });
+};
+function handle(self, deferred) {
+  while (self._37 === 3) {
+    self = self._12;
+  }
+  if (self._37 === 0) {
+    self._59.push(deferred);
+    return;
+  }
+  asap(function() {
+    var cb = self._37 === 1 ? deferred.onFulfilled : deferred.onRejected;
+    if (cb === null) {
+      if (self._37 === 1) {
+        resolve(deferred.promise, self._12);
+      } else {
+        reject(deferred.promise, self._12);
+      }
+      return;
+    }
+    var ret = tryCallOne(cb, self._12);
+    if (ret === IS_ERROR) {
+      reject(deferred.promise, LAST_ERROR);
+    } else {
+      resolve(deferred.promise, ret);
+    }
+  });
+}
+function resolve(self, newValue) {
+  // Promise Resolution Procedure: https://github.com/promises-aplus/promises-spec#the-promise-resolution-procedure
+  if (newValue === self) {
+    return reject(
+      self,
+      new TypeError('A promise cannot be resolved with itself.')
+    );
+  }
+  if (
+    newValue &&
+    (typeof newValue === 'object' || typeof newValue === 'function')
+  ) {
+    var then = getThen(newValue);
+    if (then === IS_ERROR) {
+      return reject(self, LAST_ERROR);
+    }
+    if (
+      then === self.then &&
+      newValue instanceof Promise
+    ) {
+      self._37 = 3;
+      self._12 = newValue;
+      finale(self);
+      return;
+    } else if (typeof then === 'function') {
+      doResolve(then.bind(newValue), self);
+      return;
+    }
+  }
+  self._37 = 1;
+  self._12 = newValue;
+  finale(self);
+}
+
+function reject(self, newValue) {
+  self._37 = 2;
+  self._12 = newValue;
+  finale(self);
+}
+function finale(self) {
+  for (var i = 0; i < self._59.length; i++) {
+    handle(self, self._59[i]);
+  }
+  self._59 = null;
+}
+
+function Handler(onFulfilled, onRejected, promise){
+  this.onFulfilled = typeof onFulfilled === 'function' ? onFulfilled : null;
+  this.onRejected = typeof onRejected === 'function' ? onRejected : null;
+  this.promise = promise;
+}
+
+/**
+ * Take a potentially misbehaving resolver function and make sure
+ * onFulfilled and onRejected are only called once.
+ *
+ * Makes no guarantees about asynchrony.
+ */
+function doResolve(fn, promise) {
+  var done = false;
+  var res = tryCallTwo(fn, function (value) {
+    if (done) return;
+    done = true;
+    resolve(promise, value);
+  }, function (reason) {
+    if (done) return;
+    done = true;
+    reject(promise, reason);
+  })
+  if (!done && res === IS_ERROR) {
+    done = true;
+    reject(promise, LAST_ERROR);
+  }
+}
+
+},{"asap/raw":3}],6:[function(require,module,exports){
+'use strict';
+
+var Promise = require('./core.js');
+
+module.exports = Promise;
+Promise.prototype.done = function (onFulfilled, onRejected) {
+  var self = arguments.length ? this.then.apply(this, arguments) : this;
+  self.then(null, function (err) {
+    setTimeout(function () {
+      throw err;
+    }, 0);
+  });
+};
+
+},{"./core.js":5}],7:[function(require,module,exports){
+'use strict';
+
+//This file contains the ES6 extensions to the core Promises/A+ API
+
+var Promise = require('./core.js');
+
+module.exports = Promise;
+
+/* Static Functions */
+
+var TRUE = valuePromise(true);
+var FALSE = valuePromise(false);
+var NULL = valuePromise(null);
+var UNDEFINED = valuePromise(undefined);
+var ZERO = valuePromise(0);
+var EMPTYSTRING = valuePromise('');
+
+function valuePromise(value) {
+  var p = new Promise(Promise._99);
+  p._37 = 1;
+  p._12 = value;
+  return p;
+}
+Promise.resolve = function (value) {
+  if (value instanceof Promise) return value;
+
+  if (value === null) return NULL;
+  if (value === undefined) return UNDEFINED;
+  if (value === true) return TRUE;
+  if (value === false) return FALSE;
+  if (value === 0) return ZERO;
+  if (value === '') return EMPTYSTRING;
+
+  if (typeof value === 'object' || typeof value === 'function') {
+    try {
+      var then = value.then;
+      if (typeof then === 'function') {
+        return new Promise(then.bind(value));
+      }
+    } catch (ex) {
+      return new Promise(function (resolve, reject) {
+        reject(ex);
+      });
+    }
+  }
+  return valuePromise(value);
+};
+
+Promise.all = function (arr) {
+  var args = Array.prototype.slice.call(arr);
+
+  return new Promise(function (resolve, reject) {
+    if (args.length === 0) return resolve([]);
+    var remaining = args.length;
+    function res(i, val) {
+      if (val && (typeof val === 'object' || typeof val === 'function')) {
+        if (val instanceof Promise && val.then === Promise.prototype.then) {
+          while (val._37 === 3) {
+            val = val._12;
+          }
+          if (val._37 === 1) return res(i, val._12);
+          if (val._37 === 2) reject(val._12);
+          val.then(function (val) {
+            res(i, val);
+          }, reject);
+          return;
+        } else {
+          var then = val.then;
+          if (typeof then === 'function') {
+            var p = new Promise(then.bind(val));
+            p.then(function (val) {
+              res(i, val);
+            }, reject);
+            return;
+          }
+        }
+      }
+      args[i] = val;
+      if (--remaining === 0) {
+        resolve(args);
+      }
+    }
+    for (var i = 0; i < args.length; i++) {
+      res(i, args[i]);
+    }
+  });
+};
+
+Promise.reject = function (value) {
+  return new Promise(function (resolve, reject) {
+    reject(value);
+  });
+};
+
+Promise.race = function (values) {
+  return new Promise(function (resolve, reject) {
+    values.forEach(function(value){
+      Promise.resolve(value).then(resolve, reject);
+    });
+  });
+};
+
+/* Prototype Methods */
+
+Promise.prototype['catch'] = function (onRejected) {
+  return this.then(null, onRejected);
+};
+
+},{"./core.js":5}],8:[function(require,module,exports){
+'use strict';
+
+var Promise = require('./core.js');
+
+module.exports = Promise;
+Promise.prototype['finally'] = function (f) {
+  return this.then(function (value) {
+    return Promise.resolve(f()).then(function () {
+      return value;
+    });
+  }, function (err) {
+    return Promise.resolve(f()).then(function () {
+      throw err;
+    });
+  });
+};
+
+},{"./core.js":5}],9:[function(require,module,exports){
+'use strict';
+
+module.exports = require('./core.js');
+require('./done.js');
+require('./finally.js');
+require('./es6-extensions.js');
+require('./node-extensions.js');
+
+},{"./core.js":5,"./done.js":6,"./es6-extensions.js":7,"./finally.js":8,"./node-extensions.js":10}],10:[function(require,module,exports){
+'use strict';
+
+// This file contains then/promise specific extensions that are only useful
+// for node.js interop
+
+var Promise = require('./core.js');
+var asap = require('asap');
+
+module.exports = Promise;
+
+/* Static Functions */
+
+Promise.denodeify = function (fn, argumentCount) {
+  argumentCount = argumentCount || Infinity;
+  return function () {
+    var self = this;
+    var args = Array.prototype.slice.call(arguments, 0,
+        argumentCount > 0 ? argumentCount : 0);
+    return new Promise(function (resolve, reject) {
+      args.push(function (err, res) {
+        if (err) reject(err);
+        else resolve(res);
+      })
+      var res = fn.apply(self, args);
+      if (res &&
+        (
+          typeof res === 'object' ||
+          typeof res === 'function'
+        ) &&
+        typeof res.then === 'function'
+      ) {
+        resolve(res);
+      }
+    })
+  }
+}
+Promise.nodeify = function (fn) {
+  return function () {
+    var args = Array.prototype.slice.call(arguments);
+    var callback =
+      typeof args[args.length - 1] === 'function' ? args.pop() : null;
+    var ctx = this;
+    try {
+      return fn.apply(this, arguments).nodeify(callback, ctx);
+    } catch (ex) {
+      if (callback === null || typeof callback == 'undefined') {
+        return new Promise(function (resolve, reject) {
+          reject(ex);
+        });
+      } else {
+        asap(function () {
+          callback.call(ctx, ex);
+        })
+      }
+    }
+  }
+}
+
+Promise.prototype.nodeify = function (callback, ctx) {
+  if (typeof callback != 'function') return this;
+
+  this.then(function (value) {
+    asap(function () {
+      callback.call(ctx, null, value);
+    });
+  }, function (err) {
+    asap(function () {
+      callback.call(ctx, err);
+    });
+  });
+}
+
+},{"./core.js":5,"asap":2}],11:[function(require,module,exports){
+var module;
+
+module = angular.module('starter', ['ionic', 'starter.controller', 'http-auth-interceptor', 'ngTagEditor', 'ActiveRecord', 'angularFileUpload', 'ngTouch', 'ionic-datepicker', 'ngFancySelect', 'ionic-press-again-to-exit', 'pascalprecht.translate', 'locale']);
+
+module.run(function($rootScope, platform, $ionicPlatform, $location, $http, authService, $cordovaToast, $ionicPressAgainToExit) {
+  var data, fulfill;
+  $ionicPlatform.ready(function() {
+    if (window.cordova && window.cordova.plugins.Keyboard) {
+      cordova.plugins.Keyboard.hideKeyboardAccessoryBar(true);
+    }
+    if (window.StatusBar) {
+      return StatusBar.styleDefault();
+    }
+  });
+  $ionicPressAgainToExit(function() {
+    return $cordovaToast.show('Press again to exit', 'short', 'center');
+  });
+  if ($location.url().match(/access_token/)) {
+    data = $.deparam($location.url().split("/")[1]);
+    $http.defaults.headers.common.Authorization = "Bearer " + data.access_token;
+    authService.loginConfirmed();
+  }
+  fulfill = function(data) {
+    if (data != null) {
+      $http.defaults.headers.common.Authorization = "Bearer " + data.access_token;
+      return authService.loginConfirmed();
+    }
+  };
+  $rootScope.$on('event:auth-forbidden', function() {
+    return platform.auth().then(fulfill, alert);
+  });
+  return $rootScope.$on('event:auth-loginRequired', function() {
+    return platform.auth().then(fulfill, alert);
+  });
+});
+
+module.config(function($stateProvider, $urlRouterProvider) {
+  $stateProvider.state('app', {
+    url: "",
+    abstract: true,
+    templateUrl: "templates/menu.html"
+  });
+  $stateProvider.state('app.webServer', {
+    url: "/webServer",
+    cache: false,
+    views: {
+      'menuContent': {
+        templateUrl: "templates/webServer/list.html",
+        controller: 'WebServerListCtrl'
+      }
+    },
+    resolve: {
+      cliModel: 'model',
+      collection: function(cliModel) {
+        var ret;
+        ret = new cliModel.WebServerList();
+        return ret.$fetch();
+      }
+    }
+  });
+  $stateProvider.state('app.webServerCreate', {
+    url: "/webServer/create",
+    cache: false,
+    views: {
+      'menuContent': {
+        templateUrl: "templates/webServer/create.html",
+        controller: 'WebServerCtrl'
+      }
+    },
+    resolve: {
+      cliModel: 'model',
+      model: function(cliModel) {
+        var ret;
+        return ret = new cliModel.WebServer();
+      }
+    }
+  });
+  $stateProvider.state('app.webServerEdit', {
+    url: "/webServer/edit/:id",
+    cache: false,
+    views: {
+      'menuContent': {
+        templateUrl: "templates/webServer/edit.html",
+        controller: 'WebServerCtrl'
+      }
+    },
+    resolve: {
+      id: function($stateParams) {
+        return $stateParams.id;
+      },
+      cliModel: 'model',
+      model: function(cliModel, id) {
+        var ret;
+        ret = new cliModel.WebServer({
+          id: id
+        });
+        return ret.$fetch();
+      }
+    }
+  });
+  $stateProvider.state('app.resLog', {
+    url: "/resLog",
+    cache: false,
+    views: {
+      'menuContent': {
+        templateUrl: "templates/resLog/list.html",
+        controller: 'ResLogListCtrl'
+      }
+    },
+    resolve: {
+      cliModel: 'model',
+      collection: function(cliModel) {
+        var ret;
+        ret = new cliModel.ResLogList();
+        return ret.$fetch();
+      }
+    }
+  });
+  return $urlRouterProvider.otherwise('/resLog');
+});
+
+
+
+},{}],12:[function(require,module,exports){
+var MenuCtrl, Promise, ResLogListCtrl, WebServerCtrl, WebServerListCtrl, config, env;
+
+env = require('./env.coffee');
+
+Promise = require('promise');
+
+MenuCtrl = function($scope) {
+  return _.extend($scope, {
+    env: env,
+    navigator: navigator
+  });
+};
+
+WebServerCtrl = function($scope, model, $location) {
+  return _.extend($scope, {
+    model: model,
+    save: function() {
+      return $scope.model.$save().then((function(_this) {
+        return function() {
+          return $location.url("/webServer");
+        };
+      })(this));
+    }
+  });
+};
+
+WebServerListCtrl = function($scope, collection, $location) {
+  return _.extend($scope, {
+    collection: collection,
+    create: function() {
+      return $location.url("/webServer/create");
+    },
+    edit: function(id) {
+      return $location.url("/webServer/edit/" + id);
+    },
+    "delete": function(obj) {
+      collection.remove(obj);
+      return $state.go($state.current, {}, {
+        reload: true
+      });
+    },
+    loadMore: function() {
+      return collection.$fetch().then(function() {
+        return $scope.$broadcast('scroll.infiniteScrollComplete');
+      })["catch"](alert);
+    }
+  });
+};
+
+ResLogListCtrl = function($scope, collection, $location, $state) {
+  return _.extend($scope, {
+    collection: collection,
+    loadMore: function() {
+      return collection.$fetch().then(function() {
+        return $scope.$broadcast('scroll.infiniteScrollComplete');
+      })["catch"](alert);
+    },
+    doRefresh: function() {
+      return $state.go($state.current, {}, {
+        reload: true
+      });
+    }
+  });
+};
+
+config = function() {};
+
+angular.module('starter.controller', ['ionic', 'ngCordova', 'http-auth-interceptor', 'starter.model', 'platform']).config([config]);
+
+angular.module('starter.controller').controller('MenuCtrl', ['$scope', MenuCtrl]);
+
+angular.module('starter.controller').controller('WebServerCtrl', ['$scope', 'model', '$location', WebServerCtrl]);
+
+angular.module('starter.controller').controller('WebServerListCtrl', ['$scope', 'collection', '$location', WebServerListCtrl]);
+
+angular.module('starter.controller').controller('ResLogListCtrl', ['$scope', 'collection', '$location', '$state', ResLogListCtrl]);
+
+
+
+},{"./env.coffee":13,"promise":4}],13:[function(require,module,exports){
+module.exports = {
+  isMobile: function() {
+    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  },
+  isNative: function() {
+    return /^file/i.test(document.URL);
+  },
+  platform: function() {
+    if (this.isNative()) {
+      return 'mobile';
+    } else {
+      return 'browser';
+    }
+  },
+  authUrl: 'https://mob.myvnc.com',
+  imUrl: function() {
+    return "https://mppsrc.ogcio.hksarg/im";
+  },
+  serverUrl: function(path) {
+    if (path == null) {
+      path = this.path;
+    }
+    return "http://localhost:3000";
+  },
+  path: 'healthCheck',
+  oauth2: function() {
+    return {
+      authUrl: this.authUrl + "/org/oauth2/authorize/",
+      opts: {
+        response_type: "token",
+        scope: "https://mob.myvnc.com/org/users https://mob.myvnc.com/file https://mob.myvnc.com/xmpp",
+        client_id: this.isNative() ? 'healthCheckDEVAuth' : 'healthCheckDEVAuth'
+      }
+    };
+  }
+};
+
+
+
+},{}],14:[function(require,module,exports){
+angular.module('locale', ['pascalprecht.translate']).config(function($translateProvider) {
+  return $translateProvider.useStaticFilesLoader({
+    prefix: 'locale/',
+    suffix: '.json'
+  }).registerAvailableLanguageKeys(['en', 'zh_TW'], {
+    'en_*': 'en',
+    'zh_*': 'zh_TW'
+  }).determinePreferredLanguage().fallbackLanguage('en');
+});
+
+
+
+},{}],15:[function(require,module,exports){
+var config, env, iconUrl, model,
+  extend = function(child, parent) { for (var key in parent) { if (hasProp.call(parent, key)) child[key] = parent[key]; } function ctor() { this.constructor = child; } ctor.prototype = parent.prototype; child.prototype = new ctor(); child.__super__ = parent.prototype; return child; },
+  hasProp = {}.hasOwnProperty;
+
+env = require('./env.coffee');
+
+iconUrl = function(type) {
+  var icon;
+  icon = {
+    "text/directory": "img/dir.png",
+    "text/plain": "img/txt.png",
+    "text/html": "img/html.png",
+    "application/javascript": "img/js.png",
+    "application/octet-stream": "img/dat.png",
+    "application/pdf": "img/pdf.png",
+    "application/excel": "img/xls.png",
+    "application/x-zip-compressed": "img/zip.png",
+    "application/msword": "img/doc.png",
+    "image/png": "img/png.png",
+    "image/jpeg": "img/jpg.png"
+  };
+  if (type in icon) {
+    return icon[type];
+  } else {
+    return "img/unknown.png";
+  }
+};
+
+model = function(ActiveRecord, $rootScope, $upload, platform) {
+  var Collection, Model, PageableCollection, ResLog, ResLogList, User, WebServer, WebServerList;
+  Model = (function(superClass) {
+    extend(Model, superClass);
+
+    function Model(attrs, opts) {
+      if (attrs == null) {
+        attrs = {};
+      }
+      if (opts == null) {
+        opts = {};
+      }
+      this.$initialize(attrs, opts);
+    }
+
+    Model.prototype.$changedAttributes = function(diff) {
+      return _.omit(Model.__super__.$changedAttributes.call(this, diff), '$$hashKey');
+    };
+
+    Model.prototype.$save = function(values, opts) {
+      if (this.$hasChanged()) {
+        return Model.__super__.$save.call(this, values, opts);
+      } else {
+        return new Promise(function(fulfill, reject) {
+          return fulfill(this);
+        });
+      }
+    };
+
+    return Model;
+
+  })(ActiveRecord);
+  Collection = (function(superClass) {
+    extend(Collection, superClass);
+
+    function Collection(models1, opts) {
+      this.models = models1 != null ? models1 : [];
+      if (opts == null) {
+        opts = {};
+      }
+      Collection.__super__.constructor.call(this, {}, opts);
+      this.length = this.models.length;
+    }
+
+    Collection.prototype.add = function(models, opts) {
+      var singular;
+      if (opts == null) {
+        opts = {};
+      }
+      singular = !_.isArray(models);
+      if (singular && (models != null)) {
+        models = [models];
+      }
+      return _.each(models, (function(_this) {
+        return function(item) {
+          if (!_this.contains(item)) {
+            _this.models.push(item);
+            return _this.length++;
+          }
+        };
+      })(this));
+    };
+
+    Collection.prototype.remove = function(models, opts) {
+      var singular;
+      if (opts == null) {
+        opts = {};
+      }
+      singular = !_.isArray(models);
+      if (singular && (models != null)) {
+        models = [models];
+      }
+      _.each(models, (function(_this) {
+        return function(model) {
+          return model.$destroy().then(function() {
+            return _this.models = _.filter(_this.models, function(item) {
+              return item[_this.$idAttribute] !== model[_this.$idAttribute];
+            });
+          });
+        };
+      })(this));
+      return this.length = this.models.length;
+    };
+
+    Collection.prototype.contains = function(model) {
+      var cond, ret;
+      cond = function(a, b) {
+        return a === b;
+      };
+      if (typeof model === 'object') {
+        cond = (function(_this) {
+          return function(a, b) {
+            return a[_this.$idAttribute] === b[_this.$idAttribute];
+          };
+        })(this);
+      }
+      ret = _.find(this.models, (function(_this) {
+        return function(elem) {
+          return cond(model, elem);
+        };
+      })(this));
+      return ret != null;
+    };
+
+    Collection.prototype.$fetch = function(opts) {
+      if (opts == null) {
+        opts = {};
+      }
+      return new Promise((function(_this) {
+        return function(fulfill, reject) {
+          return _this.$sync('read', _this, opts).then(function(res) {
+            var data;
+            data = _this.$parse(res.data, opts);
+            if (_.isArray(data)) {
+              _this.add(data);
+              return fulfill(_this);
+            } else {
+              return reject('Not a valid response type');
+            }
+          })["catch"](reject);
+        };
+      })(this));
+    };
+
+    return Collection;
+
+  })(Model);
+  PageableCollection = (function(superClass) {
+    extend(PageableCollection, superClass);
+
+    function PageableCollection(models, opts) {
+      if (models == null) {
+        models = [];
+      }
+      if (opts == null) {
+        opts = {};
+      }
+      this.state = {
+        count: 0,
+        skip: 0,
+        limit: 10,
+        total_page: 0
+      };
+      PageableCollection.__super__.constructor.call(this, models, opts);
+    }
+
+
+    /*
+    		opts:
+    			params:
+    				page:		page no to be fetched (first page = 1)
+    				per_page:	no of records per page
+     */
+
+    PageableCollection.prototype.$fetch = function(opts) {
+      if (opts == null) {
+        opts = {};
+      }
+      opts.params = opts.params || {};
+      opts.params.skip = this.state.skip;
+      opts.params.limit = opts.params.limit || this.state.limit;
+      return new Promise((function(_this) {
+        return function(fulfill, reject) {
+          return _this.$sync('read', _this, opts).then(function(res) {
+            var data;
+            data = _this.$parse(res.data, opts);
+            if ((data.count != null) && (data.results != null)) {
+              _this.add(data.results);
+              _this.state = _.extend(_this.state, {
+                count: data.count,
+                skip: opts.params.skip + data.results.length,
+                limit: opts.params.limit,
+                total_page: Math.ceil(data.count / opts.params.limit)
+              });
+              return fulfill(_this);
+            } else {
+              return reject('Not a valid response type');
+            }
+          })["catch"](reject);
+        };
+      })(this));
+    };
+
+    return PageableCollection;
+
+  })(Collection);
+  User = (function(superClass) {
+    extend(User, superClass);
+
+    function User() {
+      return User.__super__.constructor.apply(this, arguments);
+    }
+
+    User.prototype.$urlRoot = env.authUrl + "/org/api/users/";
+
+    User.me = function() {
+      return (new User({
+        username: 'me/'
+      })).$fetch();
+    };
+
+    return User;
+
+  })(Model);
+  WebServer = (function(superClass) {
+    extend(WebServer, superClass);
+
+    function WebServer() {
+      return WebServer.__super__.constructor.apply(this, arguments);
+    }
+
+    WebServer.prototype.$urlRoot = (env.serverUrl()) + "/api/webserver";
+
+    return WebServer;
+
+  })(Model);
+  WebServerList = (function(superClass) {
+    extend(WebServerList, superClass);
+
+    function WebServerList() {
+      return WebServerList.__super__.constructor.apply(this, arguments);
+    }
+
+    WebServerList.prototype.$urlRoot = (env.serverUrl()) + "/api/webserver";
+
+    WebServerList.prototype.$parse = function(res, opts) {
+      _.each(res.results, (function(_this) {
+        return function(value, key) {
+          return res.results[key] = new WebServer(res.results[key]);
+        };
+      })(this));
+      return res;
+    };
+
+    return WebServerList;
+
+  })(PageableCollection);
+  ResLog = (function(superClass) {
+    extend(ResLog, superClass);
+
+    function ResLog() {
+      return ResLog.__super__.constructor.apply(this, arguments);
+    }
+
+    ResLog.prototype.$urlRoot = (env.serverUrl()) + "/api/resLog";
+
+    return ResLog;
+
+  })(Model);
+  ResLogList = (function(superClass) {
+    extend(ResLogList, superClass);
+
+    function ResLogList() {
+      return ResLogList.__super__.constructor.apply(this, arguments);
+    }
+
+    ResLogList.prototype.$urlRoot = (env.serverUrl()) + "/api/resLog";
+
+    ResLogList.prototype.$parse = function(res, opts) {
+      _.each(res.results, (function(_this) {
+        return function(value, key) {
+          return res.results[key] = new ResLog(res.results[key]);
+        };
+      })(this));
+      return res;
+    };
+
+    return ResLogList;
+
+  })(PageableCollection);
+  return {
+    Model: Model,
+    Collection: Collection,
+    User: User,
+    WebServer: WebServer,
+    WebServerList: WebServerList,
+    ResLog: ResLog,
+    ResLogList: ResLogList
+  };
+};
+
+config = function() {};
+
+angular.module('starter.model', ['ionic', 'ActiveRecord', 'angularFileUpload']).config([config]);
+
+angular.module('starter.model').factory('model', ['ActiveRecord', '$rootScope', '$upload', 'platform', model]);
+
+
+
+},{"./env.coffee":13}],16:[function(require,module,exports){
+var Promise, config, env, platform;
+
+env = require('./env.coffee');
+
+Promise = require('promise');
+
+platform = function($rootScope, $cordovaInAppBrowser, $location, $http) {
+  var auth, open;
+  auth = function() {
+    var func, url;
+    url = (env.oauth2().authUrl) + "?" + ($.param(env.oauth2().opts));
+    func = {
+      mobile: function() {
+        return new Promise(function(fulfill, reject) {
+          document.addEventListener('deviceready', function() {
+            return $cordovaInAppBrowser.open(url, '_blank');
+          });
+          $rootScope.$on('$cordovaInAppBrowser:loadstart', function(e, event) {
+            return fulfill();
+          });
+          return $rootScope.$on('$cordovaInAppBrowser:exit', function(e, event) {
+            return reject("The sign in flow was canceled");
+          });
+        });
+      },
+      browser: function() {
+        return new Promise(function(fulfill, reject) {
+          window.location.href = url;
+          return fulfill();
+        });
+      }
+    };
+    return func[env.platform()]();
+  };
+  open = function(file) {
+    var func;
+    func = {
+      mobile: function() {
+        var download, fs, fserr, transferErr;
+        fserr = function(err) {
+          var msg;
+          msg = [];
+          msg[FileError.ENCODING_ERR] = 'ENCODING_ERR';
+          msg[FileError.INVALID_MODIFICATION_ERR] = 'INVALID_MODIFICATION_ERR';
+          msg[FileError.INVALID_STATE_ERR] = 'INVALID_STATE_ERR';
+          msg[FileError.NO_MODIFICATION_ALLOWED_ERR] = 'NO_MODIFICATION_ALLOWED_ERR';
+          msg[FileError.NOT_FOUND_ERR] = 'NOT_FOUND_ERR';
+          msg[FileError.NOT_READABLE_ERR] = 'NOT_READABLE_ERR';
+          msg[FileError.PATH_EXISTS_ERR] = 'PATH_EXISTS_ERR';
+          msg[FileError.QUOTA_EXCEEDED_ERR] = 'QUOTA_EXCEEDED_ERR';
+          msg[FileError.SECURITY_ERR] = 'SECURITY_ERR';
+          msg[FileError.TYPE_MISMATCH_ERR] = 'TYPE_MISMATCH_ERR';
+          return alert(msg[err.code]);
+        };
+        transferErr = function(err) {
+          var msg;
+          msg = [];
+          msg[FileTransferError.FILE_NOT_FOUND_ERR] = 'FILE_NOT_FOUND_ERR';
+          msg[FileTransferError.INVALID_URL_ERR] = 'INVALID_URL_ERR';
+          msg[FileTransferError.CONNECTION_ERR] = 'CONNECTION_ERR';
+          msg[FileTransferError.ABORT_ERR] = 'ABORT_ERR';
+          msg[FileTransferError.NOT_MODIFIED_ERR] = 'NOT_MODIFIED_ERR';
+          return alert(msg[err.code]);
+        };
+        fs = function(type, size) {
+          return new Promise(function(fulfill, reject) {
+            return window.requestFileSystem(type, size, fulfill, reject);
+          });
+        };
+        download = function(remote, local, trustAllHosts, opts) {
+          return new Promise(function(fulfill, reject) {
+            var fileTransfer;
+            fileTransfer = new FileTransfer();
+            return fileTransfer.download(encodeURI(remote), local, fulfill, reject, trustAllHosts, opts);
+          });
+        };
+        open = function(local, trustAllCertificates) {
+          return new Promise(function(fulfill, reject) {
+            return cordova.plugins.bridge.open(local, fulfill, reject, trustAllCertificates);
+          });
+        };
+        return fs(window.PERSISTENT, 0).then(function(fs) {
+          var local;
+          local = "" + (fs.root.toURL()) + file.path;
+          return download(file.url, local, false, {
+            headers: $http.defaults.headers.common
+          }).then(function() {
+            return open(local)["catch"](alert);
+          })["catch"](transferErr);
+        })["catch"](fserr);
+      },
+      browser: function() {
+        window.open(file.url, '_blank');
+        return true;
+      }
+    };
+    if (file.contentType === "text/directory") {
+      return $location.url("file/file?path=" + file.path);
+    } else {
+      return func[env.platform()]();
+    }
+  };
+  return {
+    auth: auth,
+    open: open
+  };
+};
+
+config = function($cordovaInAppBrowserProvider) {
+  var opts;
+  opts = {
+    location: 'no',
+    clearsessioncache: 'no',
+    clearcache: 'no',
+    toolbar: 'no'
+  };
+  return document.addEventListener('deviceready', function() {
+    return $cordovaInAppBrowserProvider.setDefaultOptions(opts);
+  });
+};
+
+angular.module('platform', ['ionic', 'ngCordova']).config(['$cordovaInAppBrowserProvider', config]);
+
+angular.module('platform').factory('platform', ['$rootScope', '$cordovaInAppBrowser', '$location', '$http', platform]);
+
+
+
+},{"./env.coffee":13,"promise":4}],17:[function(require,module,exports){
 /*!
  * @licence ActiveRecord for AngularJS
  * (c) 2013-2014 Bob Fanger, Jeremy Ashkenas, DocumentCloud
@@ -455,7 +1865,7 @@ angular.module('ActiveRecord', []).factory('ActiveRecord', ['$http', '$q', '$par
 	};
 	return ActiveRecord;
 }]);
-},{}],3:[function(require,module,exports){
+},{}],18:[function(require,module,exports){
 /*global angular:true, browser:true */
 
 /**
@@ -587,7 +1997,7 @@ angular.module('ActiveRecord', []).factory('ActiveRecord', ['$http', '$q', '$par
   }]);
 })();
 
-},{}],4:[function(require,module,exports){
+},{}],19:[function(require,module,exports){
 /**
  * @license AngularJS v1.3.20
  * (c) 2010-2014 Google, Inc. http://angularjs.org
@@ -1220,7 +2630,7 @@ makeSwipeDirective('ngSwipeRight', 1, 'swiperight');
 
 })(window, window.angular);
 
-},{}],5:[function(require,module,exports){
+},{}],20:[function(require,module,exports){
 /*!
  * angular-translate - v2.8.1 - 2015-10-01
  * 
@@ -1334,7 +2744,7 @@ return 'pascalprecht.translate';
 
 }));
 
-},{}],6:[function(require,module,exports){
+},{}],21:[function(require,module,exports){
 /*!
  * angular-translate - v2.8.1 - 2015-10-01
  * 
@@ -4474,7 +5884,7 @@ return 'pascalprecht.translate';
 
 }));
 
-},{}],7:[function(require,module,exports){
+},{}],22:[function(require,module,exports){
 angular.module('ionic-press-again-to-exit', [])
 .factory('$ionicPressAgainToExit', function($rootScope, $ionicPlatform, $ionicHistory) {
   return function(toast) {
@@ -4498,7 +5908,7 @@ angular.module('ionic-press-again-to-exit', [])
   };
 });
 
-},{}],8:[function(require,module,exports){
+},{}],23:[function(require,module,exports){
 (function(deparam){
     if (typeof require === 'function' && typeof exports === 'object' && typeof module === 'object') {
         var jquery = require("./../jquery/dist/jquery.js");
@@ -4605,7 +6015,7 @@ angular.module('ionic-press-again-to-exit', [])
     };
 });
 
-},{"./../jquery/dist/jquery.js":9}],9:[function(require,module,exports){
+},{"./../jquery/dist/jquery.js":24}],24:[function(require,module,exports){
 /*!
  * jQuery JavaScript Library v2.1.4
  * http://jquery.com/
@@ -13817,7 +15227,7 @@ return jQuery;
 
 }));
 
-},{}],10:[function(require,module,exports){
+},{}],25:[function(require,module,exports){
 /**!
  * AngularJS file upload/drop directive and service with progress and abort
  * @author  Danial  <danial.farid@gmail.com>
@@ -14397,7 +15807,7 @@ for (key in angularFileUpload) {
 
 })();
 
-},{}],11:[function(require,module,exports){
+},{}],26:[function(require,module,exports){
 /*!
  * ngCordova
  * v0.1.23-alpha
@@ -23402,7 +24812,7 @@ angular.module("oauth.utils", [])
     }]);
 
 })();
-},{}],12:[function(require,module,exports){
+},{}],27:[function(require,module,exports){
 
 /*
 icon tag to show specified src file or ionic icon if src is not defined  
@@ -23458,7 +24868,7 @@ angular.module('ngIcon', ['ionic']).directive('icon', ['$compile', iconDir]);
 
 
 
-},{}],13:[function(require,module,exports){
+},{}],28:[function(require,module,exports){
 (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
 require('./tag.coffee');
 
@@ -23909,7 +25319,7 @@ angular.module('ngTagEditor', []).directive('tagEditor', tagDir);
 
 },{}]},{},[1]);
 
-},{"./icon.coffee":12,"./select.coffee":14,"./tag.coffee":15}],14:[function(require,module,exports){
+},{"./icon.coffee":27,"./select.coffee":29,"./tag.coffee":30}],29:[function(require,module,exports){
 
 /*
 select from array of primitive
@@ -24215,7 +25625,7 @@ angular.module('ngFancySelect', ['ionic']).directive('fancySelect', ['$ionicPlat
 
 
 
-},{}],15:[function(require,module,exports){
+},{}],30:[function(require,module,exports){
 var tagCtrl, tagDir,
   indexOf = [].indexOf || function(item) { for (var i = 0, l = this.length; i < l; i++) { if (i in this && this[i] === item) return i; } return -1; };
 
@@ -24292,7 +25702,7 @@ angular.module('ngTagEditor', []).directive('tagEditor', tagDir);
 
 
 
-},{}],16:[function(require,module,exports){
+},{}],31:[function(require,module,exports){
 //     Underscore.js 1.8.3
 //     http://underscorejs.org
 //     (c) 2009-2015 Jeremy Ashkenas, DocumentCloud and Investigative Reporters & Editors
@@ -25842,1414 +27252,4 @@ angular.module('ngTagEditor', []).directive('tagEditor', tagDir);
   }
 }.call(this));
 
-},{}],17:[function(require,module,exports){
-"use strict";
-
-// rawAsap provides everything we need except exception management.
-var rawAsap = require("./raw");
-// RawTasks are recycled to reduce GC churn.
-var freeTasks = [];
-// We queue errors to ensure they are thrown in right order (FIFO).
-// Array-as-queue is good enough here, since we are just dealing with exceptions.
-var pendingErrors = [];
-var requestErrorThrow = rawAsap.makeRequestCallFromTimer(throwFirstError);
-
-function throwFirstError() {
-    if (pendingErrors.length) {
-        throw pendingErrors.shift();
-    }
-}
-
-/**
- * Calls a task as soon as possible after returning, in its own event, with priority
- * over other events like animation, reflow, and repaint. An error thrown from an
- * event will not interrupt, nor even substantially slow down the processing of
- * other events, but will be rather postponed to a lower priority event.
- * @param {{call}} task A callable object, typically a function that takes no
- * arguments.
- */
-module.exports = asap;
-function asap(task) {
-    var rawTask;
-    if (freeTasks.length) {
-        rawTask = freeTasks.pop();
-    } else {
-        rawTask = new RawTask();
-    }
-    rawTask.task = task;
-    rawAsap(rawTask);
-}
-
-// We wrap tasks with recyclable task objects.  A task object implements
-// `call`, just like a function.
-function RawTask() {
-    this.task = null;
-}
-
-// The sole purpose of wrapping the task is to catch the exception and recycle
-// the task object after its single use.
-RawTask.prototype.call = function () {
-    try {
-        this.task.call();
-    } catch (error) {
-        if (asap.onerror) {
-            // This hook exists purely for testing purposes.
-            // Its name will be periodically randomized to break any code that
-            // depends on its existence.
-            asap.onerror(error);
-        } else {
-            // In a web browser, exceptions are not fatal. However, to avoid
-            // slowing down the queue of pending tasks, we rethrow the error in a
-            // lower priority turn.
-            pendingErrors.push(error);
-            requestErrorThrow();
-        }
-    } finally {
-        this.task = null;
-        freeTasks[freeTasks.length] = this;
-    }
-};
-
-},{"./raw":18}],18:[function(require,module,exports){
-(function (global){
-"use strict";
-
-// Use the fastest means possible to execute a task in its own turn, with
-// priority over other events including IO, animation, reflow, and redraw
-// events in browsers.
-//
-// An exception thrown by a task will permanently interrupt the processing of
-// subsequent tasks. The higher level `asap` function ensures that if an
-// exception is thrown by a task, that the task queue will continue flushing as
-// soon as possible, but if you use `rawAsap` directly, you are responsible to
-// either ensure that no exceptions are thrown from your task, or to manually
-// call `rawAsap.requestFlush` if an exception is thrown.
-module.exports = rawAsap;
-function rawAsap(task) {
-    if (!queue.length) {
-        requestFlush();
-        flushing = true;
-    }
-    // Equivalent to push, but avoids a function call.
-    queue[queue.length] = task;
-}
-
-var queue = [];
-// Once a flush has been requested, no further calls to `requestFlush` are
-// necessary until the next `flush` completes.
-var flushing = false;
-// `requestFlush` is an implementation-specific method that attempts to kick
-// off a `flush` event as quickly as possible. `flush` will attempt to exhaust
-// the event queue before yielding to the browser's own event loop.
-var requestFlush;
-// The position of the next task to execute in the task queue. This is
-// preserved between calls to `flush` so that it can be resumed if
-// a task throws an exception.
-var index = 0;
-// If a task schedules additional tasks recursively, the task queue can grow
-// unbounded. To prevent memory exhaustion, the task queue will periodically
-// truncate already-completed tasks.
-var capacity = 1024;
-
-// The flush function processes all tasks that have been scheduled with
-// `rawAsap` unless and until one of those tasks throws an exception.
-// If a task throws an exception, `flush` ensures that its state will remain
-// consistent and will resume where it left off when called again.
-// However, `flush` does not make any arrangements to be called again if an
-// exception is thrown.
-function flush() {
-    while (index < queue.length) {
-        var currentIndex = index;
-        // Advance the index before calling the task. This ensures that we will
-        // begin flushing on the next task the task throws an error.
-        index = index + 1;
-        queue[currentIndex].call();
-        // Prevent leaking memory for long chains of recursive calls to `asap`.
-        // If we call `asap` within tasks scheduled by `asap`, the queue will
-        // grow, but to avoid an O(n) walk for every task we execute, we don't
-        // shift tasks off the queue after they have been executed.
-        // Instead, we periodically shift 1024 tasks off the queue.
-        if (index > capacity) {
-            // Manually shift all values starting at the index back to the
-            // beginning of the queue.
-            for (var scan = 0, newLength = queue.length - index; scan < newLength; scan++) {
-                queue[scan] = queue[scan + index];
-            }
-            queue.length -= index;
-            index = 0;
-        }
-    }
-    queue.length = 0;
-    index = 0;
-    flushing = false;
-}
-
-// `requestFlush` is implemented using a strategy based on data collected from
-// every available SauceLabs Selenium web driver worker at time of writing.
-// https://docs.google.com/spreadsheets/d/1mG-5UYGup5qxGdEMWkhP6BWCz053NUb2E1QoUTU16uA/edit#gid=783724593
-
-// Safari 6 and 6.1 for desktop, iPad, and iPhone are the only browsers that
-// have WebKitMutationObserver but not un-prefixed MutationObserver.
-// Must use `global` instead of `window` to work in both frames and web
-// workers. `global` is a provision of Browserify, Mr, Mrs, or Mop.
-var BrowserMutationObserver = global.MutationObserver || global.WebKitMutationObserver;
-
-// MutationObservers are desirable because they have high priority and work
-// reliably everywhere they are implemented.
-// They are implemented in all modern browsers.
-//
-// - Android 4-4.3
-// - Chrome 26-34
-// - Firefox 14-29
-// - Internet Explorer 11
-// - iPad Safari 6-7.1
-// - iPhone Safari 7-7.1
-// - Safari 6-7
-if (typeof BrowserMutationObserver === "function") {
-    requestFlush = makeRequestCallFromMutationObserver(flush);
-
-// MessageChannels are desirable because they give direct access to the HTML
-// task queue, are implemented in Internet Explorer 10, Safari 5.0-1, and Opera
-// 11-12, and in web workers in many engines.
-// Although message channels yield to any queued rendering and IO tasks, they
-// would be better than imposing the 4ms delay of timers.
-// However, they do not work reliably in Internet Explorer or Safari.
-
-// Internet Explorer 10 is the only browser that has setImmediate but does
-// not have MutationObservers.
-// Although setImmediate yields to the browser's renderer, it would be
-// preferrable to falling back to setTimeout since it does not have
-// the minimum 4ms penalty.
-// Unfortunately there appears to be a bug in Internet Explorer 10 Mobile (and
-// Desktop to a lesser extent) that renders both setImmediate and
-// MessageChannel useless for the purposes of ASAP.
-// https://github.com/kriskowal/q/issues/396
-
-// Timers are implemented universally.
-// We fall back to timers in workers in most engines, and in foreground
-// contexts in the following browsers.
-// However, note that even this simple case requires nuances to operate in a
-// broad spectrum of browsers.
-//
-// - Firefox 3-13
-// - Internet Explorer 6-9
-// - iPad Safari 4.3
-// - Lynx 2.8.7
-} else {
-    requestFlush = makeRequestCallFromTimer(flush);
-}
-
-// `requestFlush` requests that the high priority event queue be flushed as
-// soon as possible.
-// This is useful to prevent an error thrown in a task from stalling the event
-// queue if the exception handled by Node.js’s
-// `process.on("uncaughtException")` or by a domain.
-rawAsap.requestFlush = requestFlush;
-
-// To request a high priority event, we induce a mutation observer by toggling
-// the text of a text node between "1" and "-1".
-function makeRequestCallFromMutationObserver(callback) {
-    var toggle = 1;
-    var observer = new BrowserMutationObserver(callback);
-    var node = document.createTextNode("");
-    observer.observe(node, {characterData: true});
-    return function requestCall() {
-        toggle = -toggle;
-        node.data = toggle;
-    };
-}
-
-// The message channel technique was discovered by Malte Ubl and was the
-// original foundation for this library.
-// http://www.nonblocking.io/2011/06/windownexttick.html
-
-// Safari 6.0.5 (at least) intermittently fails to create message ports on a
-// page's first load. Thankfully, this version of Safari supports
-// MutationObservers, so we don't need to fall back in that case.
-
-// function makeRequestCallFromMessageChannel(callback) {
-//     var channel = new MessageChannel();
-//     channel.port1.onmessage = callback;
-//     return function requestCall() {
-//         channel.port2.postMessage(0);
-//     };
-// }
-
-// For reasons explained above, we are also unable to use `setImmediate`
-// under any circumstances.
-// Even if we were, there is another bug in Internet Explorer 10.
-// It is not sufficient to assign `setImmediate` to `requestFlush` because
-// `setImmediate` must be called *by name* and therefore must be wrapped in a
-// closure.
-// Never forget.
-
-// function makeRequestCallFromSetImmediate(callback) {
-//     return function requestCall() {
-//         setImmediate(callback);
-//     };
-// }
-
-// Safari 6.0 has a problem where timers will get lost while the user is
-// scrolling. This problem does not impact ASAP because Safari 6.0 supports
-// mutation observers, so that implementation is used instead.
-// However, if we ever elect to use timers in Safari, the prevalent work-around
-// is to add a scroll event listener that calls for a flush.
-
-// `setTimeout` does not call the passed callback if the delay is less than
-// approximately 7 in web workers in Firefox 8 through 18, and sometimes not
-// even then.
-
-function makeRequestCallFromTimer(callback) {
-    return function requestCall() {
-        // We dispatch a timeout with a specified delay of 0 for engines that
-        // can reliably accommodate that request. This will usually be snapped
-        // to a 4 milisecond delay, but once we're flushing, there's no delay
-        // between events.
-        var timeoutHandle = setTimeout(handleTimer, 0);
-        // However, since this timer gets frequently dropped in Firefox
-        // workers, we enlist an interval handle that will try to fire
-        // an event 20 times per second until it succeeds.
-        var intervalHandle = setInterval(handleTimer, 50);
-
-        function handleTimer() {
-            // Whichever timer succeeds will cancel both timers and
-            // execute the callback.
-            clearTimeout(timeoutHandle);
-            clearInterval(intervalHandle);
-            callback();
-        }
-    };
-}
-
-// This is for `asap.js` only.
-// Its name will be periodically randomized to break any code that depends on
-// its existence.
-rawAsap.makeRequestCallFromTimer = makeRequestCallFromTimer;
-
-// ASAP was originally a nextTick shim included in Q. This was factored out
-// into this ASAP package. It was later adapted to RSVP which made further
-// amendments. These decisions, particularly to marginalize MessageChannel and
-// to capture the MutationObserver implementation in a closure, were integrated
-// back into ASAP proper.
-// https://github.com/tildeio/rsvp.js/blob/cddf7232546a9cf858524b75cde6f9edf72620a7/lib/rsvp/asap.js
-
-}).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],19:[function(require,module,exports){
-'use strict';
-
-module.exports = require('./lib')
-
-},{"./lib":24}],20:[function(require,module,exports){
-'use strict';
-
-var asap = require('asap/raw');
-
-function noop() {}
-
-// States:
-//
-// 0 - pending
-// 1 - fulfilled with _value
-// 2 - rejected with _value
-// 3 - adopted the state of another promise, _value
-//
-// once the state is no longer pending (0) it is immutable
-
-// All `_` prefixed properties will be reduced to `_{random number}`
-// at build time to obfuscate them and discourage their use.
-// We don't use symbols or Object.defineProperty to fully hide them
-// because the performance isn't good enough.
-
-
-// to avoid using try/catch inside critical functions, we
-// extract them to here.
-var LAST_ERROR = null;
-var IS_ERROR = {};
-function getThen(obj) {
-  try {
-    return obj.then;
-  } catch (ex) {
-    LAST_ERROR = ex;
-    return IS_ERROR;
-  }
-}
-
-function tryCallOne(fn, a) {
-  try {
-    return fn(a);
-  } catch (ex) {
-    LAST_ERROR = ex;
-    return IS_ERROR;
-  }
-}
-function tryCallTwo(fn, a, b) {
-  try {
-    fn(a, b);
-  } catch (ex) {
-    LAST_ERROR = ex;
-    return IS_ERROR;
-  }
-}
-
-module.exports = Promise;
-
-function Promise(fn) {
-  if (typeof this !== 'object') {
-    throw new TypeError('Promises must be constructed via new');
-  }
-  if (typeof fn !== 'function') {
-    throw new TypeError('not a function');
-  }
-  this._37 = 0;
-  this._12 = null;
-  this._59 = [];
-  if (fn === noop) return;
-  doResolve(fn, this);
-}
-Promise._99 = noop;
-
-Promise.prototype.then = function(onFulfilled, onRejected) {
-  if (this.constructor !== Promise) {
-    return safeThen(this, onFulfilled, onRejected);
-  }
-  var res = new Promise(noop);
-  handle(this, new Handler(onFulfilled, onRejected, res));
-  return res;
-};
-
-function safeThen(self, onFulfilled, onRejected) {
-  return new self.constructor(function (resolve, reject) {
-    var res = new Promise(noop);
-    res.then(resolve, reject);
-    handle(self, new Handler(onFulfilled, onRejected, res));
-  });
-};
-function handle(self, deferred) {
-  while (self._37 === 3) {
-    self = self._12;
-  }
-  if (self._37 === 0) {
-    self._59.push(deferred);
-    return;
-  }
-  asap(function() {
-    var cb = self._37 === 1 ? deferred.onFulfilled : deferred.onRejected;
-    if (cb === null) {
-      if (self._37 === 1) {
-        resolve(deferred.promise, self._12);
-      } else {
-        reject(deferred.promise, self._12);
-      }
-      return;
-    }
-    var ret = tryCallOne(cb, self._12);
-    if (ret === IS_ERROR) {
-      reject(deferred.promise, LAST_ERROR);
-    } else {
-      resolve(deferred.promise, ret);
-    }
-  });
-}
-function resolve(self, newValue) {
-  // Promise Resolution Procedure: https://github.com/promises-aplus/promises-spec#the-promise-resolution-procedure
-  if (newValue === self) {
-    return reject(
-      self,
-      new TypeError('A promise cannot be resolved with itself.')
-    );
-  }
-  if (
-    newValue &&
-    (typeof newValue === 'object' || typeof newValue === 'function')
-  ) {
-    var then = getThen(newValue);
-    if (then === IS_ERROR) {
-      return reject(self, LAST_ERROR);
-    }
-    if (
-      then === self.then &&
-      newValue instanceof Promise
-    ) {
-      self._37 = 3;
-      self._12 = newValue;
-      finale(self);
-      return;
-    } else if (typeof then === 'function') {
-      doResolve(then.bind(newValue), self);
-      return;
-    }
-  }
-  self._37 = 1;
-  self._12 = newValue;
-  finale(self);
-}
-
-function reject(self, newValue) {
-  self._37 = 2;
-  self._12 = newValue;
-  finale(self);
-}
-function finale(self) {
-  for (var i = 0; i < self._59.length; i++) {
-    handle(self, self._59[i]);
-  }
-  self._59 = null;
-}
-
-function Handler(onFulfilled, onRejected, promise){
-  this.onFulfilled = typeof onFulfilled === 'function' ? onFulfilled : null;
-  this.onRejected = typeof onRejected === 'function' ? onRejected : null;
-  this.promise = promise;
-}
-
-/**
- * Take a potentially misbehaving resolver function and make sure
- * onFulfilled and onRejected are only called once.
- *
- * Makes no guarantees about asynchrony.
- */
-function doResolve(fn, promise) {
-  var done = false;
-  var res = tryCallTwo(fn, function (value) {
-    if (done) return;
-    done = true;
-    resolve(promise, value);
-  }, function (reason) {
-    if (done) return;
-    done = true;
-    reject(promise, reason);
-  })
-  if (!done && res === IS_ERROR) {
-    done = true;
-    reject(promise, LAST_ERROR);
-  }
-}
-
-},{"asap/raw":18}],21:[function(require,module,exports){
-'use strict';
-
-var Promise = require('./core.js');
-
-module.exports = Promise;
-Promise.prototype.done = function (onFulfilled, onRejected) {
-  var self = arguments.length ? this.then.apply(this, arguments) : this;
-  self.then(null, function (err) {
-    setTimeout(function () {
-      throw err;
-    }, 0);
-  });
-};
-
-},{"./core.js":20}],22:[function(require,module,exports){
-'use strict';
-
-//This file contains the ES6 extensions to the core Promises/A+ API
-
-var Promise = require('./core.js');
-
-module.exports = Promise;
-
-/* Static Functions */
-
-var TRUE = valuePromise(true);
-var FALSE = valuePromise(false);
-var NULL = valuePromise(null);
-var UNDEFINED = valuePromise(undefined);
-var ZERO = valuePromise(0);
-var EMPTYSTRING = valuePromise('');
-
-function valuePromise(value) {
-  var p = new Promise(Promise._99);
-  p._37 = 1;
-  p._12 = value;
-  return p;
-}
-Promise.resolve = function (value) {
-  if (value instanceof Promise) return value;
-
-  if (value === null) return NULL;
-  if (value === undefined) return UNDEFINED;
-  if (value === true) return TRUE;
-  if (value === false) return FALSE;
-  if (value === 0) return ZERO;
-  if (value === '') return EMPTYSTRING;
-
-  if (typeof value === 'object' || typeof value === 'function') {
-    try {
-      var then = value.then;
-      if (typeof then === 'function') {
-        return new Promise(then.bind(value));
-      }
-    } catch (ex) {
-      return new Promise(function (resolve, reject) {
-        reject(ex);
-      });
-    }
-  }
-  return valuePromise(value);
-};
-
-Promise.all = function (arr) {
-  var args = Array.prototype.slice.call(arr);
-
-  return new Promise(function (resolve, reject) {
-    if (args.length === 0) return resolve([]);
-    var remaining = args.length;
-    function res(i, val) {
-      if (val && (typeof val === 'object' || typeof val === 'function')) {
-        if (val instanceof Promise && val.then === Promise.prototype.then) {
-          while (val._37 === 3) {
-            val = val._12;
-          }
-          if (val._37 === 1) return res(i, val._12);
-          if (val._37 === 2) reject(val._12);
-          val.then(function (val) {
-            res(i, val);
-          }, reject);
-          return;
-        } else {
-          var then = val.then;
-          if (typeof then === 'function') {
-            var p = new Promise(then.bind(val));
-            p.then(function (val) {
-              res(i, val);
-            }, reject);
-            return;
-          }
-        }
-      }
-      args[i] = val;
-      if (--remaining === 0) {
-        resolve(args);
-      }
-    }
-    for (var i = 0; i < args.length; i++) {
-      res(i, args[i]);
-    }
-  });
-};
-
-Promise.reject = function (value) {
-  return new Promise(function (resolve, reject) {
-    reject(value);
-  });
-};
-
-Promise.race = function (values) {
-  return new Promise(function (resolve, reject) {
-    values.forEach(function(value){
-      Promise.resolve(value).then(resolve, reject);
-    });
-  });
-};
-
-/* Prototype Methods */
-
-Promise.prototype['catch'] = function (onRejected) {
-  return this.then(null, onRejected);
-};
-
-},{"./core.js":20}],23:[function(require,module,exports){
-'use strict';
-
-var Promise = require('./core.js');
-
-module.exports = Promise;
-Promise.prototype['finally'] = function (f) {
-  return this.then(function (value) {
-    return Promise.resolve(f()).then(function () {
-      return value;
-    });
-  }, function (err) {
-    return Promise.resolve(f()).then(function () {
-      throw err;
-    });
-  });
-};
-
-},{"./core.js":20}],24:[function(require,module,exports){
-'use strict';
-
-module.exports = require('./core.js');
-require('./done.js');
-require('./finally.js');
-require('./es6-extensions.js');
-require('./node-extensions.js');
-
-},{"./core.js":20,"./done.js":21,"./es6-extensions.js":22,"./finally.js":23,"./node-extensions.js":25}],25:[function(require,module,exports){
-'use strict';
-
-// This file contains then/promise specific extensions that are only useful
-// for node.js interop
-
-var Promise = require('./core.js');
-var asap = require('asap');
-
-module.exports = Promise;
-
-/* Static Functions */
-
-Promise.denodeify = function (fn, argumentCount) {
-  argumentCount = argumentCount || Infinity;
-  return function () {
-    var self = this;
-    var args = Array.prototype.slice.call(arguments, 0,
-        argumentCount > 0 ? argumentCount : 0);
-    return new Promise(function (resolve, reject) {
-      args.push(function (err, res) {
-        if (err) reject(err);
-        else resolve(res);
-      })
-      var res = fn.apply(self, args);
-      if (res &&
-        (
-          typeof res === 'object' ||
-          typeof res === 'function'
-        ) &&
-        typeof res.then === 'function'
-      ) {
-        resolve(res);
-      }
-    })
-  }
-}
-Promise.nodeify = function (fn) {
-  return function () {
-    var args = Array.prototype.slice.call(arguments);
-    var callback =
-      typeof args[args.length - 1] === 'function' ? args.pop() : null;
-    var ctx = this;
-    try {
-      return fn.apply(this, arguments).nodeify(callback, ctx);
-    } catch (ex) {
-      if (callback === null || typeof callback == 'undefined') {
-        return new Promise(function (resolve, reject) {
-          reject(ex);
-        });
-      } else {
-        asap(function () {
-          callback.call(ctx, ex);
-        })
-      }
-    }
-  }
-}
-
-Promise.prototype.nodeify = function (callback, ctx) {
-  if (typeof callback != 'function') return this;
-
-  this.then(function (value) {
-    asap(function () {
-      callback.call(ctx, null, value);
-    });
-  }, function (err) {
-    asap(function () {
-      callback.call(ctx, err);
-    });
-  });
-}
-
-},{"./core.js":20,"asap":17}],26:[function(require,module,exports){
-var module;
-
-module = angular.module('starter', ['ionic', 'starter.controller', 'http-auth-interceptor', 'ngTagEditor', 'ActiveRecord', 'angularFileUpload', 'ngTouch', 'ionic-datepicker', 'ngFancySelect', 'ionic-press-again-to-exit', 'pascalprecht.translate', 'locale']);
-
-module.run(function($rootScope, platform, $ionicPlatform, $location, $http, authService, $cordovaToast, $ionicPressAgainToExit) {
-  var data, fulfill;
-  $ionicPlatform.ready(function() {
-    if (window.cordova && window.cordova.plugins.Keyboard) {
-      cordova.plugins.Keyboard.hideKeyboardAccessoryBar(true);
-    }
-    if (window.StatusBar) {
-      return StatusBar.styleDefault();
-    }
-  });
-  $ionicPressAgainToExit(function() {
-    return $cordovaToast.show('Press again to exit', 'short', 'center');
-  });
-  if ($location.url().match(/access_token/)) {
-    data = $.deparam($location.url().split("/")[1]);
-    $http.defaults.headers.common.Authorization = "Bearer " + data.access_token;
-    authService.loginConfirmed();
-  }
-  fulfill = function(data) {
-    if (data != null) {
-      $http.defaults.headers.common.Authorization = "Bearer " + data.access_token;
-      return authService.loginConfirmed();
-    }
-  };
-  $rootScope.$on('event:auth-forbidden', function() {
-    return platform.auth().then(fulfill, alert);
-  });
-  return $rootScope.$on('event:auth-loginRequired', function() {
-    return platform.auth().then(fulfill, alert);
-  });
-});
-
-module.config(function($stateProvider, $urlRouterProvider) {
-  $stateProvider.state('app', {
-    url: "",
-    abstract: true,
-    templateUrl: "templates/menu.html"
-  });
-  $stateProvider.state('app.webServer', {
-    url: "/webServer",
-    cache: false,
-    views: {
-      'menuContent': {
-        templateUrl: "templates/webServer/list.html",
-        controller: 'WebServerListCtrl'
-      }
-    },
-    resolve: {
-      cliModel: 'model',
-      collection: function(cliModel) {
-        var ret;
-        ret = new cliModel.WebServerList();
-        return ret.$fetch();
-      }
-    }
-  });
-  $stateProvider.state('app.webServerCreate', {
-    url: "/webServer/create",
-    cache: false,
-    views: {
-      'menuContent': {
-        templateUrl: "templates/webServer/create.html",
-        controller: 'WebServerCtrl'
-      }
-    },
-    resolve: {
-      cliModel: 'model',
-      model: function(cliModel) {
-        var ret;
-        return ret = new cliModel.WebServer();
-      }
-    }
-  });
-  $stateProvider.state('app.webServerEdit', {
-    url: "/webServer/edit/:id",
-    cache: false,
-    views: {
-      'menuContent': {
-        templateUrl: "templates/webServer/edit.html",
-        controller: 'WebServerCtrl'
-      }
-    },
-    resolve: {
-      id: function($stateParams) {
-        return $stateParams.id;
-      },
-      cliModel: 'model',
-      model: function(cliModel, id) {
-        var ret;
-        ret = new cliModel.WebServer({
-          id: id
-        });
-        return ret.$fetch();
-      }
-    }
-  });
-  $stateProvider.state('app.resLog', {
-    url: "/resLog",
-    cache: false,
-    views: {
-      'menuContent': {
-        templateUrl: "templates/resLog/list.html",
-        controller: 'ResLogListCtrl'
-      }
-    },
-    resolve: {
-      cliModel: 'model',
-      collection: function(cliModel) {
-        var ret;
-        ret = new cliModel.ResLogList();
-        return ret.$fetch();
-      }
-    }
-  });
-  return $urlRouterProvider.otherwise('/resLog');
-});
-
-
-
-},{}],27:[function(require,module,exports){
-var MenuCtrl, Promise, ResLogListCtrl, WebServerCtrl, WebServerListCtrl, config, env;
-
-env = require('./env.coffee');
-
-Promise = require('promise');
-
-MenuCtrl = function($scope) {
-  return _.extend($scope, {
-    env: env,
-    navigator: navigator
-  });
-};
-
-WebServerCtrl = function($scope, model, $location) {
-  return _.extend($scope, {
-    model: model,
-    save: function() {
-      return $scope.model.$save().then((function(_this) {
-        return function() {
-          return $location.url("/webServer");
-        };
-      })(this));
-    }
-  });
-};
-
-WebServerListCtrl = function($scope, collection, $location) {
-  return _.extend($scope, {
-    collection: collection,
-    create: function() {
-      return $location.url("/webServer/create");
-    },
-    edit: function(id) {
-      return $location.url("/webServer/edit/" + id);
-    },
-    "delete": function(obj) {
-      collection.remove(obj);
-      return $state.go($state.current, {}, {
-        reload: true
-      });
-    },
-    loadMore: function() {
-      return collection.$fetch().then(function() {
-        return $scope.$broadcast('scroll.infiniteScrollComplete');
-      })["catch"](alert);
-    }
-  });
-};
-
-ResLogListCtrl = function($scope, collection, $location, $state) {
-  return _.extend($scope, {
-    collection: collection,
-    loadMore: function() {
-      return collection.$fetch().then(function() {
-        return $scope.$broadcast('scroll.infiniteScrollComplete');
-      })["catch"](alert);
-    },
-    doRefresh: function() {
-      return $state.go($state.current, {}, {
-        reload: true
-      });
-    }
-  });
-};
-
-config = function() {};
-
-angular.module('starter.controller', ['ionic', 'ngCordova', 'http-auth-interceptor', 'starter.model', 'platform']).config([config]);
-
-angular.module('starter.controller').controller('MenuCtrl', ['$scope', MenuCtrl]);
-
-angular.module('starter.controller').controller('WebServerCtrl', ['$scope', 'model', '$location', WebServerCtrl]);
-
-angular.module('starter.controller').controller('WebServerListCtrl', ['$scope', 'collection', '$location', WebServerListCtrl]);
-
-angular.module('starter.controller').controller('ResLogListCtrl', ['$scope', 'collection', '$location', '$state', ResLogListCtrl]);
-
-
-
-},{"./env.coffee":28,"promise":19}],28:[function(require,module,exports){
-module.exports = {
-  isMobile: function() {
-    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-  },
-  isNative: function() {
-    return /^file/i.test(document.URL);
-  },
-  platform: function() {
-    if (this.isNative()) {
-      return 'mobile';
-    } else {
-      return 'browser';
-    }
-  },
-  authUrl: 'https://mob.myvnc.com',
-  imUrl: function() {
-    return "https://mppsrc.ogcio.hksarg/im";
-  },
-  serverUrl: function(path) {
-    if (path == null) {
-      path = this.path;
-    }
-    return "http://localhost:3000";
-  },
-  path: 'healthCheck',
-  oauth2: function() {
-    return {
-      authUrl: this.authUrl + "/org/oauth2/authorize/",
-      opts: {
-        response_type: "token",
-        scope: "https://mob.myvnc.com/org/users https://mob.myvnc.com/file https://mob.myvnc.com/xmpp",
-        client_id: this.isNative() ? 'healthCheckDEVAuth' : 'healthCheckDEVAuth'
-      }
-    };
-  }
-};
-
-
-
-},{}],29:[function(require,module,exports){
-angular.module('locale', ['pascalprecht.translate']).config(function($translateProvider) {
-  return $translateProvider.useStaticFilesLoader({
-    prefix: 'locale/',
-    suffix: '.json'
-  }).registerAvailableLanguageKeys(['en', 'zh_TW'], {
-    'en_*': 'en',
-    'zh_*': 'zh_TW'
-  }).determinePreferredLanguage().fallbackLanguage('en');
-});
-
-
-
-},{}],30:[function(require,module,exports){
-var config, env, iconUrl, model,
-  extend = function(child, parent) { for (var key in parent) { if (hasProp.call(parent, key)) child[key] = parent[key]; } function ctor() { this.constructor = child; } ctor.prototype = parent.prototype; child.prototype = new ctor(); child.__super__ = parent.prototype; return child; },
-  hasProp = {}.hasOwnProperty;
-
-env = require('./env.coffee');
-
-iconUrl = function(type) {
-  var icon;
-  icon = {
-    "text/directory": "img/dir.png",
-    "text/plain": "img/txt.png",
-    "text/html": "img/html.png",
-    "application/javascript": "img/js.png",
-    "application/octet-stream": "img/dat.png",
-    "application/pdf": "img/pdf.png",
-    "application/excel": "img/xls.png",
-    "application/x-zip-compressed": "img/zip.png",
-    "application/msword": "img/doc.png",
-    "image/png": "img/png.png",
-    "image/jpeg": "img/jpg.png"
-  };
-  if (type in icon) {
-    return icon[type];
-  } else {
-    return "img/unknown.png";
-  }
-};
-
-model = function(ActiveRecord, $rootScope, $upload, platform) {
-  var Collection, Model, PageableCollection, ResLog, ResLogList, User, WebServer, WebServerList;
-  Model = (function(superClass) {
-    extend(Model, superClass);
-
-    function Model(attrs, opts) {
-      if (attrs == null) {
-        attrs = {};
-      }
-      if (opts == null) {
-        opts = {};
-      }
-      this.$initialize(attrs, opts);
-    }
-
-    Model.prototype.$changedAttributes = function(diff) {
-      return _.omit(Model.__super__.$changedAttributes.call(this, diff), '$$hashKey');
-    };
-
-    Model.prototype.$save = function(values, opts) {
-      if (this.$hasChanged()) {
-        return Model.__super__.$save.call(this, values, opts);
-      } else {
-        return new Promise(function(fulfill, reject) {
-          return fulfill(this);
-        });
-      }
-    };
-
-    return Model;
-
-  })(ActiveRecord);
-  Collection = (function(superClass) {
-    extend(Collection, superClass);
-
-    function Collection(models1, opts) {
-      this.models = models1 != null ? models1 : [];
-      if (opts == null) {
-        opts = {};
-      }
-      Collection.__super__.constructor.call(this, {}, opts);
-      this.length = this.models.length;
-    }
-
-    Collection.prototype.add = function(models, opts) {
-      var singular;
-      if (opts == null) {
-        opts = {};
-      }
-      singular = !_.isArray(models);
-      if (singular && (models != null)) {
-        models = [models];
-      }
-      return _.each(models, (function(_this) {
-        return function(item) {
-          if (!_this.contains(item)) {
-            _this.models.push(item);
-            return _this.length++;
-          }
-        };
-      })(this));
-    };
-
-    Collection.prototype.remove = function(models, opts) {
-      var singular;
-      if (opts == null) {
-        opts = {};
-      }
-      singular = !_.isArray(models);
-      if (singular && (models != null)) {
-        models = [models];
-      }
-      _.each(models, (function(_this) {
-        return function(model) {
-          return model.$destroy().then(function() {
-            return _this.models = _.filter(_this.models, function(item) {
-              return item[_this.$idAttribute] !== model[_this.$idAttribute];
-            });
-          });
-        };
-      })(this));
-      return this.length = this.models.length;
-    };
-
-    Collection.prototype.contains = function(model) {
-      var cond, ret;
-      cond = function(a, b) {
-        return a === b;
-      };
-      if (typeof model === 'object') {
-        cond = (function(_this) {
-          return function(a, b) {
-            return a[_this.$idAttribute] === b[_this.$idAttribute];
-          };
-        })(this);
-      }
-      ret = _.find(this.models, (function(_this) {
-        return function(elem) {
-          return cond(model, elem);
-        };
-      })(this));
-      return ret != null;
-    };
-
-    Collection.prototype.$fetch = function(opts) {
-      if (opts == null) {
-        opts = {};
-      }
-      return new Promise((function(_this) {
-        return function(fulfill, reject) {
-          return _this.$sync('read', _this, opts).then(function(res) {
-            var data;
-            data = _this.$parse(res.data, opts);
-            if (_.isArray(data)) {
-              _this.add(data);
-              return fulfill(_this);
-            } else {
-              return reject('Not a valid response type');
-            }
-          })["catch"](reject);
-        };
-      })(this));
-    };
-
-    return Collection;
-
-  })(Model);
-  PageableCollection = (function(superClass) {
-    extend(PageableCollection, superClass);
-
-    function PageableCollection(models, opts) {
-      if (models == null) {
-        models = [];
-      }
-      if (opts == null) {
-        opts = {};
-      }
-      this.state = {
-        count: 0,
-        skip: 0,
-        limit: 10,
-        total_page: 0
-      };
-      PageableCollection.__super__.constructor.call(this, models, opts);
-    }
-
-
-    /*
-    		opts:
-    			params:
-    				page:		page no to be fetched (first page = 1)
-    				per_page:	no of records per page
-     */
-
-    PageableCollection.prototype.$fetch = function(opts) {
-      if (opts == null) {
-        opts = {};
-      }
-      opts.params = opts.params || {};
-      opts.params.skip = this.state.skip;
-      opts.params.limit = opts.params.limit || this.state.limit;
-      return new Promise((function(_this) {
-        return function(fulfill, reject) {
-          return _this.$sync('read', _this, opts).then(function(res) {
-            var data;
-            data = _this.$parse(res.data, opts);
-            if ((data.count != null) && (data.results != null)) {
-              _this.add(data.results);
-              _this.state = _.extend(_this.state, {
-                count: data.count,
-                skip: opts.params.skip + data.results.length,
-                limit: opts.params.limit,
-                total_page: Math.ceil(data.count / opts.params.limit)
-              });
-              return fulfill(_this);
-            } else {
-              return reject('Not a valid response type');
-            }
-          })["catch"](reject);
-        };
-      })(this));
-    };
-
-    return PageableCollection;
-
-  })(Collection);
-  User = (function(superClass) {
-    extend(User, superClass);
-
-    function User() {
-      return User.__super__.constructor.apply(this, arguments);
-    }
-
-    User.prototype.$urlRoot = env.authUrl + "/org/api/users/";
-
-    User.me = function() {
-      return (new User({
-        username: 'me/'
-      })).$fetch();
-    };
-
-    return User;
-
-  })(Model);
-  WebServer = (function(superClass) {
-    extend(WebServer, superClass);
-
-    function WebServer() {
-      return WebServer.__super__.constructor.apply(this, arguments);
-    }
-
-    WebServer.prototype.$urlRoot = (env.serverUrl()) + "/api/webserver";
-
-    return WebServer;
-
-  })(Model);
-  WebServerList = (function(superClass) {
-    extend(WebServerList, superClass);
-
-    function WebServerList() {
-      return WebServerList.__super__.constructor.apply(this, arguments);
-    }
-
-    WebServerList.prototype.$urlRoot = (env.serverUrl()) + "/api/webserver";
-
-    WebServerList.prototype.$parse = function(res, opts) {
-      _.each(res.results, (function(_this) {
-        return function(value, key) {
-          return res.results[key] = new WebServer(res.results[key]);
-        };
-      })(this));
-      return res;
-    };
-
-    return WebServerList;
-
-  })(PageableCollection);
-  ResLog = (function(superClass) {
-    extend(ResLog, superClass);
-
-    function ResLog() {
-      return ResLog.__super__.constructor.apply(this, arguments);
-    }
-
-    ResLog.prototype.$urlRoot = (env.serverUrl()) + "/api/resLog";
-
-    return ResLog;
-
-  })(Model);
-  ResLogList = (function(superClass) {
-    extend(ResLogList, superClass);
-
-    function ResLogList() {
-      return ResLogList.__super__.constructor.apply(this, arguments);
-    }
-
-    ResLogList.prototype.$urlRoot = (env.serverUrl()) + "/api/resLog";
-
-    ResLogList.prototype.$parse = function(res, opts) {
-      _.each(res.results, (function(_this) {
-        return function(value, key) {
-          return res.results[key] = new ResLog(res.results[key]);
-        };
-      })(this));
-      return res;
-    };
-
-    return ResLogList;
-
-  })(PageableCollection);
-  return {
-    Model: Model,
-    Collection: Collection,
-    User: User,
-    WebServer: WebServer,
-    WebServerList: WebServerList,
-    ResLog: ResLog,
-    ResLogList: ResLogList
-  };
-};
-
-config = function() {};
-
-angular.module('starter.model', ['ionic', 'ActiveRecord', 'angularFileUpload']).config([config]);
-
-angular.module('starter.model').factory('model', ['ActiveRecord', '$rootScope', '$upload', 'platform', model]);
-
-
-
-},{"./env.coffee":28}],31:[function(require,module,exports){
-var Promise, config, env, platform;
-
-env = require('./env.coffee');
-
-Promise = require('promise');
-
-platform = function($rootScope, $cordovaInAppBrowser, $location, $http) {
-  var auth, open;
-  auth = function() {
-    var func, url;
-    url = (env.oauth2().authUrl) + "?" + ($.param(env.oauth2().opts));
-    func = {
-      mobile: function() {
-        return new Promise(function(fulfill, reject) {
-          document.addEventListener('deviceready', function() {
-            return $cordovaInAppBrowser.open(url, '_blank');
-          });
-          $rootScope.$on('$cordovaInAppBrowser:loadstart', function(e, event) {
-            return fulfill();
-          });
-          return $rootScope.$on('$cordovaInAppBrowser:exit', function(e, event) {
-            return reject("The sign in flow was canceled");
-          });
-        });
-      },
-      browser: function() {
-        return new Promise(function(fulfill, reject) {
-          window.location.href = url;
-          return fulfill();
-        });
-      }
-    };
-    return func[env.platform()]();
-  };
-  open = function(file) {
-    var func;
-    func = {
-      mobile: function() {
-        var download, fs, fserr, transferErr;
-        fserr = function(err) {
-          var msg;
-          msg = [];
-          msg[FileError.ENCODING_ERR] = 'ENCODING_ERR';
-          msg[FileError.INVALID_MODIFICATION_ERR] = 'INVALID_MODIFICATION_ERR';
-          msg[FileError.INVALID_STATE_ERR] = 'INVALID_STATE_ERR';
-          msg[FileError.NO_MODIFICATION_ALLOWED_ERR] = 'NO_MODIFICATION_ALLOWED_ERR';
-          msg[FileError.NOT_FOUND_ERR] = 'NOT_FOUND_ERR';
-          msg[FileError.NOT_READABLE_ERR] = 'NOT_READABLE_ERR';
-          msg[FileError.PATH_EXISTS_ERR] = 'PATH_EXISTS_ERR';
-          msg[FileError.QUOTA_EXCEEDED_ERR] = 'QUOTA_EXCEEDED_ERR';
-          msg[FileError.SECURITY_ERR] = 'SECURITY_ERR';
-          msg[FileError.TYPE_MISMATCH_ERR] = 'TYPE_MISMATCH_ERR';
-          return alert(msg[err.code]);
-        };
-        transferErr = function(err) {
-          var msg;
-          msg = [];
-          msg[FileTransferError.FILE_NOT_FOUND_ERR] = 'FILE_NOT_FOUND_ERR';
-          msg[FileTransferError.INVALID_URL_ERR] = 'INVALID_URL_ERR';
-          msg[FileTransferError.CONNECTION_ERR] = 'CONNECTION_ERR';
-          msg[FileTransferError.ABORT_ERR] = 'ABORT_ERR';
-          msg[FileTransferError.NOT_MODIFIED_ERR] = 'NOT_MODIFIED_ERR';
-          return alert(msg[err.code]);
-        };
-        fs = function(type, size) {
-          return new Promise(function(fulfill, reject) {
-            return window.requestFileSystem(type, size, fulfill, reject);
-          });
-        };
-        download = function(remote, local, trustAllHosts, opts) {
-          return new Promise(function(fulfill, reject) {
-            var fileTransfer;
-            fileTransfer = new FileTransfer();
-            return fileTransfer.download(encodeURI(remote), local, fulfill, reject, trustAllHosts, opts);
-          });
-        };
-        open = function(local, trustAllCertificates) {
-          return new Promise(function(fulfill, reject) {
-            return cordova.plugins.bridge.open(local, fulfill, reject, trustAllCertificates);
-          });
-        };
-        return fs(window.PERSISTENT, 0).then(function(fs) {
-          var local;
-          local = "" + (fs.root.toURL()) + file.path;
-          return download(file.url, local, false, {
-            headers: $http.defaults.headers.common
-          }).then(function() {
-            return open(local)["catch"](alert);
-          })["catch"](transferErr);
-        })["catch"](fserr);
-      },
-      browser: function() {
-        window.open(file.url, '_blank');
-        return true;
-      }
-    };
-    if (file.contentType === "text/directory") {
-      return $location.url("file/file?path=" + file.path);
-    } else {
-      return func[env.platform()]();
-    }
-  };
-  return {
-    auth: auth,
-    open: open
-  };
-};
-
-config = function($cordovaInAppBrowserProvider) {
-  var opts;
-  opts = {
-    location: 'no',
-    clearsessioncache: 'no',
-    clearcache: 'no',
-    toolbar: 'no'
-  };
-  return document.addEventListener('deviceready', function() {
-    return $cordovaInAppBrowserProvider.setDefaultOptions(opts);
-  });
-};
-
-angular.module('platform', ['ionic', 'ngCordova']).config(['$cordovaInAppBrowserProvider', config]);
-
-angular.module('platform').factory('platform', ['$rootScope', '$cordovaInAppBrowser', '$location', '$http', platform]);
-
-
-
-},{"./env.coffee":28,"promise":19}]},{},[1]);
+},{}]},{},[1]);

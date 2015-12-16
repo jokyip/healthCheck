@@ -1,7 +1,8 @@
-path = '/healthCheck'
+path = 'healthCheck'
 
 module.exports =
-	port: 			8014
+	url:			"http://mob.myvnc.com/#{path}"
+	port: 			8020
 	promise:
 		timeout:	10000 # ms
 	oauth2:
@@ -23,7 +24,7 @@ module.exports =
 			password:	'pass1234'
 			database:	'healthCheck'
 	log:
-		level:		'silly'
+		level:		'info'
 	resLog:
 		type:
 			error: 		'Error'

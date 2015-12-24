@@ -7,7 +7,7 @@ module.exports =
 	oauth2:
 		verifyURL:			"https://mob.myvnc.com/org/oauth2/verify/"
 		tokenURL:			"https://mob.myvnc.com/org/oauth2/token/"
-		scope:				[ "https://mob.myvnc.com/org/users", "https://mob.myvnc.com/file", "https://mob.myvnc.com/xmpp"]
+		scope:				[ "https://mob.myvnc.com/org/users"]
 	webServer:
 		access:
 			interval: 1 # 1 min		

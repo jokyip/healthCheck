@@ -993,7 +993,7 @@ module.exports = {
       authUrl: this.authUrl + "/org/oauth2/authorize/",
       opts: {
         response_type: "token",
-        scope: "https://mob.myvnc.com/org/users https://mob.myvnc.com/file https://mob.myvnc.com/xmpp",
+        scope: "https://mob.myvnc.com/org/users",
         client_id: this.isNative() ? 'healthCheckDEVAuth' : 'healthCheckDEVAuth'
       }
     };

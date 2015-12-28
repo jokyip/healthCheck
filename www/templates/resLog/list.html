@@ -12,13 +12,13 @@
 			    <i class="icon ion-search placeholder-icon"></i>
 			    <input type="search" placeholder="Search" ng-model="logFilter">
 			</label>
-			<ion-item ng-repeat="model in collection.models | filter: logFilter" ng-class="model.statusType == 'Error' ? 'error' : ''">				
+			<ion-item ng-repeat="model in collection.models | resLogFilter: logFilter" ng-class="model.statusType == 'Error' ? 'error' : ''">				
 				<div class='row'>
 					<div class='col'>
 						{{model.webServer.name}}
 					</div>
 					<div class='col'>
-						{{model.createdAt | date: 'yyyy-MM-dd HH:mm'}}
+						{{model.createdAt}}
 					</div>
 					<div class='col'>
 						{{model.statusCode}}

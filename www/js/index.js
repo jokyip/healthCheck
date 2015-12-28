@@ -883,7 +883,7 @@ module.config(function($stateProvider, $urlRouterProvider) {
 
 
 },{}],12:[function(require,module,exports){
-var MenuCtrl, Promise, ResLogListCtrl, WebServerCtrl, WebServerListCtrl, config, env;
+var MenuCtrl, Promise, ResLogFilter, ResLogListCtrl, WebServerCtrl, WebServerListCtrl, config, env;
 
 env = require('./env.coffee');
 
@@ -948,6 +948,21 @@ ResLogListCtrl = function($scope, collection, $location, $state) {
   });
 };
 
+ResLogFilter = function() {
+  return function(resLog, search) {
+    var r;
+    r = new RegExp(search, 'i');
+    if (search) {
+      return _.filter(resLog, function(item) {
+        var ref;
+        return r.test(item != null ? (ref = item.webServer) != null ? ref.name : void 0 : void 0) || r.test(item != null ? item.createdAt : void 0) || r.test(item != null ? item.statusCode : void 0) || r.test(item != null ? item.statusMsg : void 0) || r.test(item != null ? item.statusType : void 0);
+      });
+    } else {
+      return resLog;
+    }
+  };
+};
+
 config = function() {};
 
 angular.module('starter.controller', ['ionic', 'ngCordova', 'http-auth-interceptor', 'starter.model', 'platform']).config([config]);
@@ -959,6 +974,8 @@ angular.module('starter.controller').controller('WebServerCtrl', ['$scope', 'mod
 angular.module('starter.controller').controller('WebServerListCtrl', ['$scope', 'collection', '$location', WebServerListCtrl]);
 
 angular.module('starter.controller').controller('ResLogListCtrl', ['$scope', 'collection', '$location', '$state', ResLogListCtrl]);
+
+angular.module('starter.controller').filter('resLogFilter', ResLogFilter);
 
 
 
@@ -1044,7 +1061,7 @@ iconUrl = function(type) {
   }
 };
 
-model = function(ActiveRecord, $rootScope, $upload, platform) {
+model = function(ActiveRecord, $rootScope, $upload, platform, $filter) {
   var Collection, Model, PageableCollection, ResLog, ResLogList, User, WebServer, WebServerList;
   Model = (function(superClass) {
     extend(Model, superClass);
@@ -1305,7 +1322,10 @@ model = function(ActiveRecord, $rootScope, $upload, platform) {
     ResLogList.prototype.$parse = function(res, opts) {
       _.each(res.results, (function(_this) {
         return function(value, key) {
-          return res.results[key] = new ResLog(res.results[key]);
+          var obj;
+          obj = new ResLog(res.results[key]);
+          obj.createdAt = $filter('date')(obj.createdAt, 'yyyy-MM-dd HH:mm');
+          return res.results[key] = obj;
         };
       })(this));
       return res;
@@ -1329,7 +1349,7 @@ config = function() {};
 
 angular.module('starter.model', ['ionic', 'ActiveRecord', 'angularFileUpload']).config([config]);
 
-angular.module('starter.model').factory('model', ['ActiveRecord', '$rootScope', '$upload', 'platform', model]);
+angular.module('starter.model').factory('model', ['ActiveRecord', '$rootScope', '$upload', 'platform', '$filter', model]);
 
 
 

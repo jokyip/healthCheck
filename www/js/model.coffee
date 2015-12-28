@@ -15,7 +15,7 @@ iconUrl = (type) ->
 		"image/jpeg":					"img/jpg.png"
 	return if type of icon then icon[type] else "img/unknown.png"
 		
-model = (ActiveRecord, $rootScope, $upload, platform) ->
+model = (ActiveRecord, $rootScope, $upload, platform, $filter) ->
 	
 	class Model extends ActiveRecord
 		constructor: (attrs = {}, opts = {}) ->
@@ -139,7 +139,9 @@ model = (ActiveRecord, $rootScope, $upload, platform) ->
 		
 		$parse: (res, opts) ->
 			_.each res.results, (value, key) =>
-				res.results[key] = new ResLog res.results[key]
+				obj = new ResLog res.results[key]
+				obj.createdAt = $filter('date') obj.createdAt, 'yyyy-MM-dd HH:mm'
+				res.results[key] = obj 
 			return res
 
 	Model:		Model
@@ -155,4 +157,4 @@ config = ->
 	
 angular.module('starter.model', ['ionic', 'ActiveRecord', 'angularFileUpload']).config [config]
 
-angular.module('starter.model').factory 'model', ['ActiveRecord', '$rootScope', '$upload', 'platform', model]
+angular.module('starter.model').factory 'model', ['ActiveRecord', '$rootScope', '$upload', 'platform', '$filter', model]

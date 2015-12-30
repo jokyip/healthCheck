@@ -1,37 +1,26 @@
-###
-WebServer.coffee
-
-@description :: TODO: You might write a short summary of how this model works and what it represents here.
-@docs        :: http://sailsjs.org/#!documentation/models
-###
-
 module.exports =
 
-    tableName:	'webServer'
-		
-	schema:		true
-	
-	autoUpdatedAt: true
-	
-	autoCreatedAt: true
-	
+	tableName:	'webServer'
+
+	schema:	true
+
 	attributes:
 		name:
-			type: 		'string'
+			type:	'string'
 			required:	true
-			unique:		true
+			unique:	true
 		url:				
-			type: 		'string'
+			type:	'string'
 			required:	true
 		interval:
-			type: 		'integer'
+			type:	'integer'
 			defaultsTo:	5	
 		createdAt:
-			type:		'datetime'
+			type:	'datetime'
 			defaultsTo:	new Date()
 		createdBy:
-			type: 		'string'
+			type:	'string'
 			required:	true
 		updatedAt:
-			type:		'datetime'
+			type:	'datetime'
 			defaultsTo:	new Date()

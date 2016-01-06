@@ -10,7 +10,8 @@ module.exports =
 	create: (req, res) ->
 		Model = actionUtil.parseModel(req)
 		data = actionUtil.parseValues(req)
-		
+		if !data.notifyTo
+			data.notifyTo = "#{data.createdBy}@#{sails.config.im.xmpp.domain}"
 		Model.create(data)
 			.then (newInstance) ->
 				sails.services.scheduler.add newInstance
@@ -21,7 +22,8 @@ module.exports =
 		pk = actionUtil.requirePk(req)
 		Model = actionUtil.parseModel(req)
 		data = actionUtil.parseValues(req)
-			
+		if !data.notifyTo
+			data.notifyTo = "#{data.createdBy}@#{sails.config.im.xmpp.domain}"	
 		Model
 			.update({id: pk},data)
       		.then (updatedInstance) ->

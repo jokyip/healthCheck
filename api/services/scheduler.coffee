@@ -23,7 +23,7 @@ sendNotification = (instance) ->
 				sails.log.info "Notification is sent to " + result.body.to
 			rejectmsg = (err) ->
 				sails.log.error "Notification is sent with error: " + err
-			#send msg	
+			#send msg			
 			sendMsg(instance, result.body.access_token).then fulfillmsg, rejectmsg
 		else 	
 			sails.log.warn "Send notification is disabled. Please check system configuration."
@@ -40,7 +40,7 @@ sendMsg = (instance, todoAdminToken) ->
 		
 		data = 
 			from: 	sails.config.im.adminjid
-			to:		"#{instance.createdBy}@#{sails.config.im.xmpp.domain}"
+			to:		"#{instance.notifyTo}"
 			body: 	sails.config.im.txt	+ " -> Time : " + dateformat(instance.createdAt, 'dd/mmm/yyyy HH:MM') + ", Name : " + instance.webServer.name + ", Code : " + instance.statusCode + ", Msg : " + instance.statusMsg	
 
 		http.post sails.config.im.url, data, opts, (err, res) ->
@@ -63,7 +63,8 @@ module.exports =
 	    	http.get server.url, opts , (err, res) ->
 		    	instance = 
 		    		webServer: server
-		    		createdBy: server.createdBy		    				    	
+		    		createdBy: server.createdBy
+		    		notifyTo: server.notifyTo
 		    	if err
 		    		sails.log.error err
 		    		instance.statusCode = 500
@@ -73,7 +74,7 @@ module.exports =
 		    		instance.statusCode = res.statusCode
 		    		instance.statusMsg = status[res.statusCode]   	
 		    		instance.statusType = if res.statusCode >= 400 then sails.config.resLog.type.error else sails.config.resLog.type.success					    			
-	    		sails.log.info "Health Check result: " + """ #{instance.webServer.name} | #{instance.webServer.url} | #{instance.statusCode} | #{instance.statusMsg} | #{instance.statusType} | #{instance.createdBy} """
+	    		sails.log.info "Health Check result: " + """ #{instance.webServer.name} | #{instance.webServer.url} | #{instance.statusCode} | #{instance.statusMsg} | #{instance.statusType} | #{instance.createdBy} | #{instance.notifyTo} """
 	    		sails.models.reslog
 	    			.create(instance)
 	    			.then (result) ->

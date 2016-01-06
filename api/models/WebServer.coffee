@@ -20,7 +20,10 @@ module.exports =
 			defaultsTo:	new Date()
 		createdBy:
 			type:	'string'
-			required:	true
+			required:	true			
 		updatedAt:
 			type:	'datetime'
 			defaultsTo:	new Date()
+		notifyTo:
+			type:	'string'
+			required:	true	

@@ -44,9 +44,16 @@ connections:
 		database:	'healthCheck'
 ```
 
-*	update environment variables in www/js/env.cofffee for client
+*	update environment variables in www/js/env.coffee for client
 ```
-path: '/healthCheck'		
+path: '/healthCheck'
+
+# proxy server setting (if required)
+agent = require 'https-proxy-agent'
+
+http:
+	opts:
+		agent:	new agent("http://proxy.server.com:8080")
 
 ```
 

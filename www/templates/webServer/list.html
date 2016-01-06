@@ -19,6 +19,9 @@
 					<div class='col'>
 						{{model.interval}} min
 					</div>
+					<div class='col-40'>
+						{{model.notifyTo}}
+					</div>
 				</div>
 				<ion-option-button class="button button-positive icon-left ion-edit" on-tap="$event.stopPropagation(); edit('{{model.id}}')">Edit</ion-option-button>
 				<ion-option-button class="button button-assertive icon-left ion-trash-b" on-tap="$event.stopPropagation(); delete(model)">Delete</ion-option-button>

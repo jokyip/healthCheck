@@ -10,13 +10,13 @@
 		<ion-list>
 			<ion-item ng-repeat="model in collection.models" ng-class="model.$hasChanged() ? 'dirty' : ''" on-tap="$event.stopPropagation(); read('{{model.id}}');">				
 				<div class='row'>
-					<div class='col'>
+					<div class='col-10'>
 						{{model.name}}
 					</div>
-					<div class='col'>
+					<div class='col-40'>
 						{{model.url}}
 					</div>
-					<div class='col'>
+					<div class='col-10'>
 						{{model.interval}} min
 					</div>
 					<div class='col-40'>

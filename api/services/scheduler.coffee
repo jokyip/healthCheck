@@ -40,7 +40,7 @@ sendMsg = (instance, todoAdminToken) ->
 		
 		data = 
 			from: 	sails.config.im.adminjid
-			to:		"#{instance.notifyTo}"
+			to:		if instance.notifyTo then instance.notifyTo else "#{data.createdBy}@#{sails.config.im.xmpp.domain}"
 			body: 	sails.config.im.txt	+ " -> Time : " + dateformat(instance.createdAt, 'dd/mmm/yyyy HH:MM') + ", Name : " + instance.webServer.name + ", Code : " + instance.statusCode + ", Msg : " + instance.statusMsg	
 
 		http.post sails.config.im.url, data, opts, (err, res) ->

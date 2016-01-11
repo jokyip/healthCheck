@@ -8,7 +8,6 @@ module.exports =
 		name:
 			type:	'string'
 			required:	true
-			unique:	true
 		url:				
 			type:	'string'
 			required:	true
@@ -26,4 +25,7 @@ module.exports =
 			defaultsTo:	new Date()
 		notifyTo:
 			type:	'string'
-			required:	true	
+			required:	true
+		index:
+			type:	'string'
+			unique:	true

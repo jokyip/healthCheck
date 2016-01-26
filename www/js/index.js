@@ -900,11 +900,15 @@ WebServerCtrl = function($scope, model, $location) {
   return _.extend($scope, {
     model: model,
     save: function() {
-      return $scope.model.$save().then((function(_this) {
-        return function() {
-          return $location.url("/webServer");
-        };
-      })(this));
+      return $scope.model.$save().then(function() {
+        return $location.url("/webServer");
+      })["catch"](function(err) {
+        return alert({
+          data: {
+            error: "Name already exists. Please choose other name."
+          }
+        });
+      });
     }
   });
 };
@@ -919,10 +923,7 @@ WebServerListCtrl = function($scope, collection, $location) {
       return $location.url("/webServer/edit/" + id);
     },
     "delete": function(obj) {
-      collection.remove(obj);
-      return $state.go($state.current, {}, {
-        reload: true
-      });
+      return collection.remove(obj);
     },
     loadMore: function() {
       return collection.$fetch().then(function() {
@@ -1905,7 +1906,7 @@ angular.module('ActiveRecord', []).factory('ActiveRecord', ['$http', '$q', '$par
        * retry of all deferred requests.
        * @param data an optional argument to pass on to $broadcast which may be useful for
        * example if you need to pass through details of the user that was logged in
-       * @param configUpdater an optional transformation function that can modify the                                                                                                                                                   
+       * @param configUpdater an optional transformation function that can modify the
        * requests that are retried after having logged in.  This can be used for example
        * to add an authentication token.  It must return the request.
        */
@@ -1939,11 +1940,12 @@ angular.module('ActiveRecord', []).factory('ActiveRecord', ['$http', '$q', '$par
     $httpProvider.interceptors.push(['$rootScope', '$q', 'httpBuffer', function($rootScope, $q, httpBuffer) {
       return {
         responseError: function(rejection) {
-          if (!rejection.config.ignoreAuthModule) {
+          var config = rejection.config || {};
+          if (!config.ignoreAuthModule) {
             switch (rejection.status) {
               case 401:
                 var deferred = $q.defer();
-                httpBuffer.append(rejection.config, deferred);
+                httpBuffer.append(config, deferred);
                 $rootScope.$broadcast('event:auth-loginRequired', rejection);
                 return deferred.promise;
               case 403:

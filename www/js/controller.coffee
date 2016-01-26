@@ -10,9 +10,11 @@ WebServerCtrl = ($scope, model, $location) ->
 	_.extend $scope,
 		model: model
 		save: ->			
-			$scope.model.$save().then =>
-				$location.url "/webServer"
-	
+			$scope.model.$save()
+				.then ->
+					$location.url "/webServer"
+				.catch (err) ->
+					alert {data:{error:"Name already exists. Please choose other name."}}
 	
 WebServerListCtrl = ($scope, collection, $location) ->
 	_.extend $scope,
@@ -23,7 +25,6 @@ WebServerListCtrl = ($scope, collection, $location) ->
 			$location.url "/webServer/edit/#{id}"			
 		delete: (obj) ->
 			collection.remove obj
-			$state.go($state.current, {}, { reload: true })
 		loadMore: ->
 			collection.$fetch()
 				.then ->

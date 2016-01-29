@@ -23,7 +23,7 @@ sendNotification = (instance) ->
 				sails.log.info "Notification is sent to " + result.body.to
 			rejectmsg = (err) ->
 				sails.log.error "Notification is sent with error: " + err
-			#send msg			
+			#send msg
 			sendMsg(instance, result.body.access_token).then fulfillmsg, rejectmsg
 		else 	
 			sails.log.warn "Send notification is disabled. Please check system configuration."
@@ -41,7 +41,16 @@ sendMsg = (instance, todoAdminToken) ->
 		data = 
 			from: 	sails.config.im.adminjid
 			to:		if instance.notifyTo then instance.notifyTo else "#{data.createdBy}@#{sails.config.im.xmpp.domain}"
-			body: 	sails.config.im.txt	+ " -> Time : " + dateformat(instance.createdAt, 'dd/mmm/yyyy HH:MM') + ", Name : " + instance.webServer.name + ", Code : " + instance.statusCode + ", Msg : " + instance.statusMsg	
+			body: 	"""
+					#{sails.config.im.txt}
+					
+					Time: #{dateformat(instance.createdAt, 'dd/mmm/yyyy HH:MM')}
+					Name: #{instance.webServer.name} 
+					URL: #{instance.webServer.url}
+					Error Code: #{instance.statusCode}
+					Error Message: #{instance.statusMsg}
+					 					
+					"""	
 
 		http.post sails.config.im.url, data, opts, (err, res) ->
 			if err

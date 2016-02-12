@@ -254,3 +254,22 @@ input[type='search'] {
 .error, .error .item-content {
 	color: red;
 }
+
+/* util.auth */
+.scroll {
+	height: 100%;
+}
+iframe {
+	width: 100%;
+	height: 100%;	
+}
+.item-avatar i:first-child, .item-avatar .item-img {
+	position: absolute;
+	top: 15px;
+	left: 15px;
+	font-size: 36px;
+	max-width: 40px;
+	max-height: 40px;
+	width: 100%;
+	border-radius: 4px; 
+}

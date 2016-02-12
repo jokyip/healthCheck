@@ -8,7 +8,7 @@
     </ion-nav-buttons>
 	<ion-content>
 		<ion-list>
-			<ion-item ng-repeat="model in collection.models" ng-class="model.$hasChanged() ? 'dirty' : ''" on-tap="$event.stopPropagation(); read('{{model.id}}');">				
+			<ion-item ng-repeat="model in collection.models" on-tap="$event.stopPropagation(); read('{{model.id}}');">				
 				<div class='row'>
 					<div class='col-10'>
 						{{model.name}}

@@ -13,12 +13,12 @@ angular.module 'starter.model', ['PageableAR']
 		
 		# WebServer model
 		class WebServer extends pageableAR.Model
-			$urlRoot: "#{env.serverUrl}/api/webserver"
+			$urlRoot: "#{env.serverUrl()}/api/webserver"
 			
 		class WebServerList extends pageableAR.PageableCollection
 			model: WebServer
 		
-			$urlRoot: "#{env.serverUrl}/api/webserver"
+			$urlRoot: "#{env.serverUrl()}/api/webserver"
 			
 			$parse: (res, opts) ->
 				_.each res.results, (value, key) =>
@@ -27,12 +27,12 @@ angular.module 'starter.model', ['PageableAR']
 		
 		# ResLog model
 		class ResLog extends pageableAR.Model
-			$urlRoot: "#{env.serverUrl}/api/resLog"
+			$urlRoot: "#{env.serverUrl()}/api/resLog"
 			
 		class ResLogList extends pageableAR.PageableCollection
 			model: ResLog
 			
-			$urlRoot: "#{env.serverUrl}/api/resLog"
+			$urlRoot: "#{env.serverUrl()}/api/resLog"
 			
 			$parse: (res, opts) ->
 				_.each res.results, (value, key) =>

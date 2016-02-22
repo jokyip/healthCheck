@@ -13,6 +13,19 @@
 	    	<span class="input-label">URL</span>
 	    	<input type="text" ng-model="model.url">
 		</label>
+		<div class="item item-input" ng-init="model.method='GET'; option = ['GET','POST']">
+		 	<span class="input-label">Method</span>
+			<fancy-select
+				template-url='templates/webServer/select.html'
+				ng-selected="model.method"
+				ng-model="option"
+				title="Method">
+			</fancy-select>
+		</div>
+		<label class="item item-input" ng-show="model.method==='POST'">
+	    	<span class="input-label">Data</span>
+	    	<input type="text" ng-model="model.data" placeholder="e.g. name1=value1&name2=value2">
+		</label>
 		<label class="item item-input">
 	    	<span class="input-label">Interval (min)</span>
 	    	<input type="text" ng-model="model.interval">

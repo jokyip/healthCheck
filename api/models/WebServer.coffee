@@ -11,6 +11,11 @@ module.exports =
 		url:				
 			type:	'string'
 			required:	true
+		method:
+			type:	'string'
+			required:	true
+		data:
+			type:	'string'		
 		interval:
 			type:	'integer'
 			defaultsTo:	5	
@@ -19,7 +24,7 @@ module.exports =
 			defaultsTo:	new Date()
 		createdBy:
 			type:	'string'
-			required:	true			
+			required:	true
 		updatedAt:
 			type:	'datetime'
 			defaultsTo:	new Date()
@@ -29,3 +34,9 @@ module.exports =
 		index:
 			type:	'string'
 			unique:	true
+			
+	beforeValidate: (values, cb) ->
+		if !values.notifyTo
+			values.notifyTo = "#{values.createdBy}@#{sails.config.im.xmpp.domain}"
+		values.index = values.name + values.createdBy
+		cb()	

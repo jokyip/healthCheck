@@ -69,7 +69,7 @@ module.exports =
 		opts = _.extend options, sails.config.http.opts
 		interval = Math.max server.interval, sails.config.webServer.access.interval
 		job = new schedule.CronJob "0 0-59/#{interval} * * * *", ->
-	    	http.get server.url, opts , (err, res) ->
+			http.request server.method, server.url, server.data, opts , (err, res) ->
 		    	instance = 
 		    		webServer: server
 		    		createdBy: server.createdBy

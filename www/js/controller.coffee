@@ -9,12 +9,17 @@ MenuCtrl = ($scope) ->
 WebServerCtrl = ($scope, model, $location) ->
 	_.extend $scope,
 		model: model
-		save: ->			
+		save: ->
+			if $scope.model.method isnt 'POST'
+				$scope.model.data = null
 			$scope.model.$save()
 				.then ->
 					$location.url "/webServer"
 				.catch (err) ->
 					alert {data:{error:"Name already exists. Please choose other name."}}
+					
+	$scope.$on 'Method', (event, item) =>
+		$scope.model.method = item				
 	
 WebServerListCtrl = ($scope, collection, $location) ->
 	_.extend $scope,

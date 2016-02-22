@@ -1,0 +1,53 @@
+<span>
+	<a class="button icon-right ion-ios-arrow-down" ng-click="click()">
+		{{selectedTitle()}}
+	</a>
+	
+	<script id="fancy-select.html" type="text/ng-template">
+	    <ion-view class="fancy-select-items modal">
+	      <ion-header-bar class="bar-positive">
+	
+			<button ng-click="close()" class="button button-positive button-icon ion-ios-arrow-back"></button>
+	        
+	        <h1 class="title">{{title}}</h1>
+			
+	      </ion-header-bar>
+	      <ion-content>
+	        <div class="list">
+	          <!-- Single select -->
+	          <label
+	                 ng-repeat="item in model"
+	                 ng-if="!multiple"
+	                 ng-click="select({label: item, selected: true}); $emit('{{title}}',item)"
+	                 class="item item-text-wrap">
+	            {{item}}
+	          </label>
+	        </div>
+	      </ion-content>
+	    </ion-view>
+	</script>
+	
+	<script id="fancy-select-object.html" type="text/ng-template">
+	    <ion-view class="fancy-select-items modal">
+	      <ion-header-bar class="bar-positive item-input-inset">
+	
+			<button ng-click="close()" class="button button-positive button-icon ion-ios-arrow-back"></button>
+	        
+	        <h1 class="title">{{title}}</h1>
+			
+	      </ion-header-bar>
+	      <ion-content>
+	        <div class="list">
+	          <!-- Single select -->
+	          <label
+	                 ng-repeat="item in model"
+	                 ng-if="!multiple"
+	                 ng-click="item.label = item.name; select(item); $emit('{{title}}',item)"
+	                 class="item item-text-wrap">
+	            {{item.name}}
+	          </label>
+	        </div>
+	      </ion-content>
+	    </ion-view>
+	</script>
+</span>

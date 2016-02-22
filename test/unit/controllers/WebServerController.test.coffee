@@ -6,20 +6,20 @@ describe 'WebServerController', ->
 	
 		id = null
 	
-		it 'Create WebServer', (done) ->
+		it 'Create WebServer', ->
 			request(sails.hooks.http.app)
 			.post('/api/webServer')
-			.send({ name: 'unitTest', url: 'http://www.google.com.hk', createdBy:'jokyip' })
+			.send({ name: 'unitTest', url: 'http://abc.com', interval: 1, createdBy:'jokyip' })
 			.set('Authorization',"Bearer #{sails.token}")
 			.expect (res)->
 				id = res.body.id
-			.expect(201, done)
+			.expect(201)
 			
-		it 'Read WebServer', (done) ->
+		it 'Read WebServer', ->
 			request(sails.hooks.http.app)
 			.get("/api/webServer/#{id}")
 			.set('Authorization',"Bearer #{sails.token}")
-			.expect(200, done)
+			.expect(200)
 			
 		it 'Delete WebServer', (done) ->
 			request(sails.hooks.http.app)

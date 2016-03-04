@@ -46,6 +46,8 @@ ResLogListCtrl = ($scope, collection, $location, $state) ->
 				.catch alert
 		doRefresh: ->
 			$state.go($state.current, {}, {reload: true});
+		readWebServer: (id) ->
+			$location.url "/webServer/#{id}"	
 			
 ResLogFilter = ->
 	(resLog, search) ->

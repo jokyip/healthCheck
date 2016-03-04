@@ -57,7 +57,22 @@ angular.module 'starter', ['ionic', 'starter.controller', 'starter.model', 'util
 				cliModel: 'model'	
 				model: (cliModel, id) ->
 					ret = new cliModel.WebServer({id: id})
-					ret.$fetch()			
+					ret.$fetch()
+					
+		$stateProvider.state 'app.webServerRead',
+			url: "/webServer/:id"
+			cache: false
+			views:
+				'menuContent':
+					templateUrl: "templates/webServer/read.html"
+					controller: 'WebServerCtrl'
+			resolve:
+				id: ($stateParams) ->
+					$stateParams.id
+				cliModel: 'model'	
+				model: (cliModel, id) ->
+					ret = new cliModel.WebServer({id: id})
+					ret.$fetch()						
 	
 		# ResLog
 		$stateProvider.state 'app.resLog',

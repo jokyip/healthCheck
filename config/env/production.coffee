@@ -8,6 +8,9 @@ module.exports =
 		verifyURL:			"https://mob.myvnc.com/org/oauth2/verify/"
 		tokenURL:			"https://mob.myvnc.com/org/oauth2/token/"
 		scope:				[ "https://mob.myvnc.com/org/users"]
+	http:
+		opts:
+			follow_max: 5
 	webServer:
 		access:
 			interval: 1 # 1 min		

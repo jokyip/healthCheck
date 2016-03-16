@@ -14,6 +14,7 @@ module.exports =
 	http:
 		opts:
 			agent:	new agent("http://proxy1.scig.gov.hk:8080")
+			follow_max: 5
 	webServer:
 		access:
 			interval: 1 # 1 min		

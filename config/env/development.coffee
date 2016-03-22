@@ -27,8 +27,8 @@ module.exports =
 			driver:		'mongodb'
 			host:		'localhost'
 			port:		27017
-			user:		'healthCheckrw'
-			password:	'pass1234'
+			user:		'jokyip'
+			password:	'password'
 			database:	'healthCheck'
 	log:
 		level:		'silly'
@@ -39,11 +39,11 @@ module.exports =
 	im:
 		url: 		"https://mob.myvnc.com/im.app/api/msg"
 		client:
-			id:		'todomsgDEVAuth'
-			secret: 'pass1234'
+			id:		'healthCheckMsgAuth'
+			secret: 'password'
 		user:
 			id: 	'healthCheckSails'
-			secret: 'pass1234'
+			secret: 'password'
 		scope:  	[ "https://mob.myvnc.com/org/users", "https://mob.myvnc.com/mobile"]
 		txt:		"Health Check message"
 		xmpp:

@@ -3,6 +3,8 @@ FROM node:4-slim
 WORKDIR /usr/src/app
 
 ADD https://github.com/jokyip/healthCheck/archive/master.tar.gz /tmp
+ADD /etc/ssl/certs/mob* /etc/ssl/certs/
+ADD /usr/local/share/ca-certificates/mob* /usr/local/share/ca-certificates/
 
 RUN apt-get update && \
 	apt-get -y install git && \

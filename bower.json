@@ -21,7 +21,7 @@
     "ngCordova": "~0.1.14-alpha",
     "jquery": "~2.1.3",
     "jquery-deparam": "~0.2.0",
-    "sails.io.js": "~0.13.6",
+    "sails.io.js": "git://github.com/twhtanghk/sails.io.js.git#~0.11.6",
     "sails-auth": "*",
     "tagDirective": "*",
     "ionic-datepicker": "~0.9.0",

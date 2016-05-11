@@ -20,9 +20,9 @@ sendNotification = (instance) ->
 	fulfill = (result) ->
 		if sails.config.im.sendmsg
 			fulfillmsg = (result) ->
-				sails.log.info "Notification is sent to " + result.body.to
+				sails.log.info "Notification is sent to #{result.body.to} at #{dateformat(new Date(), 'dd/mmm/yyyy HH:MM')}"
 			rejectmsg = (err) ->
-				sails.log.error "Notification is sent with error: " + err
+				sails.log.error "Notification is sent with error: #{err} at #{dateformat(new Date(), 'dd/mmm/yyyy HH:MM')}"
 			#send msg
 			sendMsg(instance, result.body.access_token).then fulfillmsg, rejectmsg
 		else 	
@@ -52,15 +52,18 @@ sendMsg = (instance, todoAdminToken) ->
 					 					
 					"""	
 
-		http.post sails.config.im.url, data, opts, (err, res) ->
+		http.post sails.config.im.url, data, opts, (err, res) ->			
 			if err
+				sails.log.debug "IM POST API with err"
 				return reject err
+			sails.log.debug "IM POST API responded"	
 			fulfill res	
 	
 getToken = ->
 	return new Promise (fulfill, reject) ->
 		sails.services.rest.token sails.config.oauth2.tokenURL, sails.config.im.client, sails.config.im.user, sails.config.im.scope
 			.then (res) ->
+				sails.log.debug "getToken success"
 				fulfill res
 			.catch reject
 
@@ -83,14 +86,14 @@ module.exports =
 		    		instance.statusCode = res.statusCode
 		    		instance.statusMsg = status[res.statusCode]   	
 		    		instance.statusType = if res.statusCode >= 400 then sails.config.resLog.type.error else sails.config.resLog.type.success					    			
-	    		sails.log.info "Health Check result: " + """ #{instance.webServer.name} | #{instance.webServer.url} | #{instance.statusCode} | #{instance.statusMsg} | #{instance.statusType} | #{instance.createdBy} | #{instance.notifyTo} """
+	    		sails.log.info "Health Check result at #{dateformat(new Date(), 'dd/mmm/yyyy HH:MM')}: " + """ #{instance.webServer.name} | #{instance.webServer.url} | #{instance.statusCode} | #{instance.statusMsg} | #{instance.statusType} | #{instance.createdBy} | #{instance.notifyTo} """
 	    		sails.models.reslog
 	    			.create(instance)
 	    			.then (result) ->
 	    				if result.statusType == sails.config.resLog.type.error
 	    					sendNotification(result)
 	    			.catch (err) ->
-	    				sails.log err
+	    				sails.log.error err
 		, null, true, ''
 		jobManager[server.id] = job
 	

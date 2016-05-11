@@ -54,16 +54,16 @@ sendMsg = (instance, todoAdminToken) ->
 
 		http.post sails.config.im.url, data, opts, (err, res) ->			
 			if err
-				sails.log.debug "IM POST API with err"
+				sails.log.verbose "IM POST API with err"
 				return reject err
-			sails.log.debug "IM POST API responded"	
+			sails.log.verbose "IM POST API responded"	
 			fulfill res	
 	
 getToken = ->
 	return new Promise (fulfill, reject) ->
 		sails.services.rest.token sails.config.oauth2.tokenURL, sails.config.im.client, sails.config.im.user, sails.config.im.scope
 			.then (res) ->
-				sails.log.debug "getToken success"
+				sails.log.verbose "getToken success"
 				fulfill res
 			.catch reject
 

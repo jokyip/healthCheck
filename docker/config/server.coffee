@@ -25,11 +25,7 @@ module.exports =
 		mongo:
 			adapter:	'sails-mongo'
 			driver:		'mongodb'
-			host:		'db'
-			port:		27017
-			user:		'jokyip'
-			password:	'password'
-			database:	'healthCheck'
+			url:		'mongodb://healthcheck_mongo/healthCheck'
 	log:
 		level:		'silly'
 	resLog:

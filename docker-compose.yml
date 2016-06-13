@@ -18,6 +18,7 @@ services:
       hostname: healthcheck
       volumes:
        - /home/myroot/docker.shell/healthcheck/conf/server.coffee:/usr/src/app/config/env/production.coffee
+       - /home/myroot/docker.shell/healthcheck/conf/client.coffee:/usr/src/app/www/js/env.coffee
        - /etc/ssl/certs:/etc/ssl/certs       
        - /usr/local/share/ca-certificates:/usr/local/share/ca-certificates
    

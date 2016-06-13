@@ -1,4 +1,4 @@
-io.sails.url = 'http://localhost:3000'
+io.sails.url = 'https://mob.myvnc.com'
 io.sails.path = "/healthCheck/socket.io"
 io.sails.useCORSRouteToGetCookie = false
 
@@ -13,7 +13,7 @@ module.exports =
 	imUrl: () ->
 		"https://mppsrc.ogcio.hksarg/im"
 	serverUrl: (path = @path) ->
-		"http://localhost:3000"
+		"https://mob.myvnc.com/#{path}"
 	path: 'healthCheck'		
 	oauth2:
 		authUrl: "#{@authUrl}/org/oauth2/authorize/"
@@ -21,4 +21,4 @@ module.exports =
 			authUrl: "https://mob.myvnc.com/org/oauth2/authorize/"
 			response_type:	"token"
 			scope:			"https://mob.myvnc.com/org/users"
-			client_id:		'healthCheckDEVAuth'	
+			client_id:		'healthCheckUATAuth'	

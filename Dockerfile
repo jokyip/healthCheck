@@ -15,5 +15,7 @@ RUN apt-get update && \
 	bower install --allow-root && \
 	node_modules/.bin/gulp && \
 	ln -s /usr/local/bin/coffee /usr/bin/coffee
-
-ENTRYPOINT npm start --prod
+	
+EXPOSE 1337
+        
+ENTRYPOINT ./entrypoint.sh

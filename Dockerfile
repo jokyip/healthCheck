@@ -12,7 +12,7 @@ RUN apt-get update && \
 	rm /tmp/master.tar.gz && \
 	npm install bower coffee-script -g && \
 	npm install && \
-	bower install --allow-root && \
+	bower install --allow-root
 	
 EXPOSE 1337
         

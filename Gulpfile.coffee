@@ -14,7 +14,7 @@ templateCache = require 'gulp-angular-templatecache'
 
 paths = sass: ['./scss/**/*.scss']
 
-gulp.task 'default', ['sass', 'coffee']
+gulp.task 'default', ['sass', 'copy', 'coffee']
 
 gulp.task 'sass', (done) ->
   gulp.src('./scss/ionic.app.scss')

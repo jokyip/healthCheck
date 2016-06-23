@@ -42,8 +42,4 @@ module.exports =
 		xmpp:
 			domain:	'mob.myvnc.com'
 		adminjid:	"healthCheckSails@mob.myvnc.com"
-		sendmsg:	true		
-	
-	mail:
-		url:	"http://localhost:3002/mail/api/mail"
-		subject:	"Health Check message"								
+		sendmsg:	true
